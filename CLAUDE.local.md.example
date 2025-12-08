@@ -1,0 +1,38 @@
+# CLAUDE.local.md (Ejemplo)
+
+Este archivo es para preferencias personales que NO se commitean al repo.
+Cópialo y renómbralo quitando ".example"
+
+## Mi Contexto Personal
+
+- Nombre: [Tu nombre]
+- Empresa: [Tu empresa]
+- Rol: DevOps Engineer
+
+## Proyectos Actuales
+
+### Proyecto 1
+- Cliente: [Nombre cliente]
+- Stack: AWS, ECS, Terraform
+- Ambiente: us-east-1
+
+### Proyecto 2
+- Cliente: [Nombre cliente]
+- Stack: Azure, Container Apps
+- Ambiente: eastus
+
+## Preferencias
+
+- Prefiero explicaciones concisas
+- Usar español casual
+- Código comentado en inglés
+
+## Credenciales (URLs, no secrets)
+
+- AWS Console: https://console.aws.amazon.com
+- Azure Portal: https://portal.azure.com
+- GitHub: https://github.com/[tu-usuario]
+
+## Notas Personales
+
+[Agrega aquí notas que solo sean relevantes para ti]

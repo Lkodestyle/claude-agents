@@ -1,0 +1,45 @@
+# Claude local files
+CLAUDE.local.md
+*.local.md
+
+# Memory database
+memory.db
+memory.db-journal
+memory.db-shm
+memory.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs
+*.log
+
+# Secrets (nunca commitear)
+.env
+.env.*
+secrets.yml
+credentials.json
