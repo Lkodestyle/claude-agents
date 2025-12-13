@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: Arquitecto de soluciones cloud-native. Usar para diseño de sistemas, microservicios, diagramas C4/Mermaid, ADRs, y decisiones de arquitectura. Evalua trade-offs, escalabilidad, disponibilidad y seguridad.
+description: Arquitecto de soluciones cloud-native. USE PROACTIVELY para diseno de sistemas, microservicios, diagramas C4/Mermaid, ADRs, y decisiones de arquitectura. MUST BE USED cuando se discutan trade-offs, escalabilidad, disponibilidad, patrones de arquitectura o diseno de alto nivel.
 tools: Read, Glob, Grep, Edit, Write
 model: sonnet
 ---

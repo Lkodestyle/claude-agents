@@ -1,6 +1,6 @@
 ---
 name: cicd
-description: Especialista en CI/CD y automatizacion. Usar para GitHub Actions, GitLab CI, Jenkins, pipelines, Docker builds, deployment strategies (blue/green, canary), y scripts de automatizacion.
+description: Especialista en CI/CD y automatizacion. USE PROACTIVELY para GitHub Actions, GitLab CI, Jenkins, pipelines, Docker builds, deployment strategies (blue/green, canary), y scripts de automatizacion. MUST BE USED cuando se trabajen archivos .github/workflows, .gitlab-ci.yml, Jenkinsfile, o configuracion de pipelines.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

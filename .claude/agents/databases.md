@@ -1,6 +1,6 @@
 ---
 name: databases
-description: Especialista en bases de datos SQL y NoSQL. Usar para PostgreSQL, MySQL, DynamoDB, Redis, MongoDB, queries, indices, migraciones, backups, performance tuning y diseno de schemas.
+description: Especialista en bases de datos SQL y NoSQL. USE PROACTIVELY para PostgreSQL, MySQL, DynamoDB, Redis, MongoDB, queries, indices, migraciones, backups, performance tuning y diseno de schemas. MUST BE USED cuando se escriban queries SQL, se diseñen schemas, o se optimice rendimiento de base de datos.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

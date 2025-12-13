@@ -1,6 +1,6 @@
 ---
 name: networking
-description: Especialista en redes cloud y on-premise. Usar para VPCs, VNets, subnets, CIDR planning, security groups, load balancers, VPN, peering, Transit Gateway, y troubleshooting de conectividad.
+description: Especialista en redes cloud y on-premise. USE PROACTIVELY para VPCs, VNets, subnets, CIDR planning, security groups, load balancers, VPN, peering, Transit Gateway, y troubleshooting de conectividad. MUST BE USED cuando se disene networking, se configuren firewalls, o se resuelvan problemas de conectividad.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

@@ -1,6 +1,6 @@
 ---
 name: programming
-description: Desarrollador senior especializado en clean code y best practices. Usar para code review, design patterns (Repository, Factory, Service Layer), SOLID, testing (unit/integration), refactoring y API design.
+description: Desarrollador senior especializado en clean code y best practices. USE PROACTIVELY para code review, design patterns (Repository, Factory, Service Layer), SOLID, testing (unit/integration), refactoring y API design. MUST BE USED cuando se revise codigo, se implementen patrones de diseno, o se escriban tests.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

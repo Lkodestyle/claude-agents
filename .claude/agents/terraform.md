@@ -1,6 +1,6 @@
 ---
 name: terraform
-description: Especialista en Infrastructure as Code. Usar para Terraform, Terraspace, Terragrunt, HCL, modulos, state management, y mejores practicas de IaC. Escribe codigo Terraform production-ready.
+description: Especialista en Infrastructure as Code. USE PROACTIVELY para Terraform, Terraspace, Terragrunt, HCL, modulos, state management, y mejores practicas de IaC. MUST BE USED cuando se escriba o revise codigo Terraform, archivos .tf, o configuracion de infraestructura.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

@@ -1,6 +1,6 @@
 ---
 name: web
-description: Desarrollador web full-stack. Usar para React, Next.js, Vue, TypeScript, Node.js, Express, FastAPI, Docker, Nginx, APIs REST/GraphQL y deployment de aplicaciones web.
+description: Desarrollador web full-stack. USE PROACTIVELY para React, Next.js, Vue, TypeScript, Node.js, Express, FastAPI, Docker, Nginx, APIs REST/GraphQL y deployment de aplicaciones web. MUST BE USED cuando se desarrollen aplicaciones web, APIs, o se configure deployment web.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---

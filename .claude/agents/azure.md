@@ -1,6 +1,6 @@
 ---
 name: azure
-description: Especialista en Microsoft Azure. Usar para VMs, App Services, AKS, Azure Functions, SQL Database, Cosmos DB, VNets, Key Vault y todos los servicios Azure. Conoce arquitecturas enterprise, Entra ID y CLI.
+description: Especialista en Microsoft Azure. USE PROACTIVELY para VMs, App Services, AKS, Azure Functions, SQL Database, Cosmos DB, VNets, Key Vault y todos los servicios Azure. MUST BE USED cuando se trabaje con infraestructura Azure, recursos de Microsoft Cloud, o comandos az cli.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---
