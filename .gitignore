@@ -1,6 +1,7 @@
 # Claude local files
 CLAUDE.local.md
 *.local.md
+.claude/settings.local.json
 
 # Memory database
 memory.db
