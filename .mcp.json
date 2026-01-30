@@ -23,5 +23,24 @@
         "NOTION_TOKEN": "${NOTION_TOKEN}"
       }
     }
+  },
+
+  "_mcp_proxy_config": {
+    "description": "Alternative: Use mcp-proxy to aggregate all servers into one endpoint",
+    "setup_instructions": [
+      "1. Install mcp-proxy: go install github.com/tbxark/mcp-proxy@latest",
+      "2. Copy mcp-proxy-config.json to your preferred location",
+      "3. Run: mcp-proxy -config mcp-proxy-config.json",
+      "4. Replace mcpServers above with the mcp-proxy-unified section below"
+    ],
+    "mcp_proxy_unified": {
+      "mcp-proxy": {
+        "type": "sse",
+        "url": "http://localhost:9090/fetch/sse",
+        "headers": {
+          "Authorization": "Bearer ${MCP_PROXY_TOKEN}"
+        }
+      }
+    }
   }
 }

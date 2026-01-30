@@ -1,0 +1,77 @@
+{
+  "mcpProxy": {
+    "baseURL": "http://localhost:9090",
+    "addr": ":9090",
+    "name": "claude-agents-proxy",
+    "version": "1.0.0",
+    "type": "sse",
+    "options": {
+      "authTokens": ["${MCP_PROXY_TOKEN}"],
+      "logEnabled": true,
+      "panicIfInvalid": false
+    }
+  },
+  "mcpServers": [
+    {
+      "name": "memory",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "options": {
+        "disabled": false
+      }
+    },
+    {
+      "name": "context7",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "options": {
+        "disabled": false
+      }
+    },
+    {
+      "name": "supabase",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+      "options": {
+        "disabled": false
+      }
+    },
+    {
+      "name": "notion",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
+      },
+      "options": {
+        "disabled": false
+      }
+    },
+    {
+      "name": "github",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "options": {
+        "disabled": true,
+        "toolFilter": {
+          "mode": "allow",
+          "tools": [
+            "search_repositories",
+            "get_file_contents",
+            "create_issue",
+            "list_issues",
+            "create_pull_request"
+          ]
+        }
+      }
+    }
+  ]
+}

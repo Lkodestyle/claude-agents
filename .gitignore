@@ -3,6 +3,11 @@ CLAUDE.local.md
 *.local.md
 .claude/settings.local.json
 
+# Context Router runtime state
+.claude/attn_state.json
+.claude/attention_history.jsonl
+.claude/pool/
+
 # Memory database
 memory.db
 memory.db-journal

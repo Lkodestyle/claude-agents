@@ -1,0 +1,72 @@
+{
+  "$schema": "https://claude.ai/schemas/claude-code-settings.json",
+  "description": "Claude Code settings with cognitive hooks for intelligent agent activation",
+
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/context-router.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/pool-loader.py",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/pool-extractor.py",
+            "timeout": 3000
+          }
+        ]
+      }
+    ]
+  },
+
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(pip *)",
+      "Bash(python *)",
+      "Bash(terraform *)",
+      "Bash(kubectl *)",
+      "Bash(docker *)",
+      "Bash(aws *)",
+      "Bash(az *)",
+      "Read(*)",
+      "Write(.claude/*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__memory__*",
+      "mcp__context7__*",
+      "mcp__notion__*"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo *)",
+      "Bash(* --force)"
+    ]
+  }
+}
