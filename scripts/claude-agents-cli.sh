@@ -34,7 +34,9 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 GLOBAL_AGENTS="$CLAUDE_HOME/agents"
 GLOBAL_SCRIPTS="$CLAUDE_HOME/scripts"
-VERSION="2.0.0"
+GLOBAL_COMMANDS="$CLAUDE_HOME/commands"
+GLOBAL_SKILLS="$CLAUDE_HOME/skills"
+VERSION="3.0.0"
 
 # ============================================================================
 # HELP
@@ -65,7 +67,12 @@ ${BOLD}COMMANDS:${NC}
     ${GREEN}proxy${NC}       Start mcp-proxy server (requires Go installation)
                 --background  Run in background
 
-    ${GREEN}uninstall${NC}   Remove installed agents and scripts
+    ${GREEN}obsidian${NC}    Setup Obsidian Vault MCP server
+                Configures @bitbonsai/mcpvault for your vault
+
+    ${GREEN}plugins${NC}     Show recommended plugins and skills
+
+    ${GREEN}uninstall${NC}   Remove installed agents, scripts, and skills
 
     ${GREEN}help${NC}        Show this help message
 
@@ -76,6 +83,8 @@ ${BOLD}EXAMPLES:${NC}
     ./scripts/claude-agents-cli.sh sync                 # Sync after git pull
     ./scripts/claude-agents-cli.sh status               # Check status
     ./scripts/claude-agents-cli.sh test                 # Test scripts
+    ./scripts/claude-agents-cli.sh obsidian             # Setup Obsidian vault
+    ./scripts/claude-agents-cli.sh plugins              # Show recommended plugins
 
 ${BOLD}ENVIRONMENT VARIABLES:${NC}
     CLAUDE_HOME         Override ~/.claude location
@@ -83,6 +92,7 @@ ${BOLD}ENVIRONMENT VARIABLES:${NC}
     MCP_PROXY_TOKEN     Token for mcp-proxy authentication
     NOTION_TOKEN        Notion integration token
     GITHUB_TOKEN        GitHub personal access token
+    OBSIDIAN_VAULT_PATH Path to your Obsidian vault
 
 ${BOLD}MORE INFO:${NC}
     Repository: https://github.com/your-org/claude-agents
@@ -157,7 +167,7 @@ cmd_install() {
     fi
 
     # Create directories
-    mkdir -p "$install_dir"/{agents,scripts,pool}
+    mkdir -p "$install_dir"/{agents,scripts,commands,skills,pool}
 
     # Install agents
     log_step "Installing agents..."
@@ -183,6 +193,36 @@ cmd_install() {
     else
         cp -r "$REPO_DIR/.claude/scripts" "$scripts_target"
         log_info "Scripts copied"
+    fi
+
+    # Install commands
+    log_step "Installing slash commands..."
+    local commands_target="$install_dir/commands"
+    if [[ -d "$REPO_DIR/.claude/commands" ]]; then
+        backup_if_exists "$commands_target"
+
+        if [[ "$mode" == "symlink" ]]; then
+            ln -s "$REPO_DIR/.claude/commands" "$commands_target"
+            log_info "Commands symlinked"
+        else
+            cp -r "$REPO_DIR/.claude/commands" "$commands_target"
+            log_info "Commands copied"
+        fi
+    fi
+
+    # Install skills
+    log_step "Installing workflow skills..."
+    local skills_target="$install_dir/skills"
+    if [[ -d "$REPO_DIR/.claude/skills" ]]; then
+        backup_if_exists "$skills_target"
+
+        if [[ "$mode" == "symlink" ]]; then
+            ln -s "$REPO_DIR/.claude/skills" "$skills_target"
+            log_info "Skills symlinked"
+        else
+            cp -r "$REPO_DIR/.claude/skills" "$skills_target"
+            log_info "Skills copied"
+        fi
     fi
 
     # Install config files
@@ -286,6 +326,31 @@ cmd_status() {
             if [[ -f "$agent" ]]; then
                 local name=$(basename "$agent" .md)
                 printf "  ${GREEN}•${NC} %-15s\n" "$name"
+            fi
+        done
+    fi
+
+    # List commands
+    echo ""
+    if [[ -d "$GLOBAL_COMMANDS" ]]; then
+        echo -e "${BOLD}Installed Commands ($(ls -1 "$GLOBAL_COMMANDS"/*.md 2>/dev/null | wc -l)):${NC}"
+        for cmd in "$GLOBAL_COMMANDS"/*.md; do
+            if [[ -f "$cmd" ]]; then
+                local name=$(basename "$cmd" .md)
+                printf "  ${GREEN}•${NC} /%s\n" "$name"
+            fi
+        done
+    fi
+
+    # List skills
+    echo ""
+    if [[ -d "$GLOBAL_SKILLS" ]]; then
+        local skill_count=$(find "$GLOBAL_SKILLS" -name "SKILL.md" 2>/dev/null | wc -l)
+        echo -e "${BOLD}Installed Skills ($skill_count):${NC}"
+        for skill_dir in "$GLOBAL_SKILLS"/*/; do
+            if [[ -f "${skill_dir}SKILL.md" ]]; then
+                local name=$(basename "$skill_dir")
+                printf "  ${MAGENTA}•${NC} %s\n" "$name"
             fi
         done
     fi
@@ -408,6 +473,75 @@ cmd_test() {
 }
 
 # ============================================================================
+# OBSIDIAN
+# ============================================================================
+
+cmd_obsidian() {
+    if [[ -f "$REPO_DIR/scripts/setup-obsidian.sh" ]]; then
+        bash "$REPO_DIR/scripts/setup-obsidian.sh" "$@"
+    else
+        log_error "setup-obsidian.sh not found in $REPO_DIR/scripts/"
+        exit 1
+    fi
+}
+
+# ============================================================================
+# PLUGINS
+# ============================================================================
+
+cmd_plugins() {
+    log_header "Recommended Plugins & Skills"
+
+    echo -e "${BOLD}Essential Plugins:${NC}"
+    echo ""
+    printf "  ${GREEN}%-20s${NC} %s\n" "superpowers" "14 workflow skills: brainstorming, TDD, debugging, plans, code review, parallel agents"
+    printf "  ${GREEN}%-20s${NC} %s\n" "skill-creator" "Create and test custom skills with eval framework"
+    printf "  ${GREEN}%-20s${NC} %s\n" "context7" "Up-to-date library/framework documentation via MCP"
+    echo ""
+
+    echo -e "${BOLD}Optional Plugins (by use case):${NC}"
+    echo ""
+    printf "  ${CYAN}%-20s${NC} %s\n" "github" "GitHub repos, PRs, issues management"
+    printf "  ${CYAN}%-20s${NC} %s\n" "gitlab" "GitLab repos, MRs, pipelines"
+    printf "  ${CYAN}%-20s${NC} %s\n" "playwright" "E2E browser testing automation"
+    printf "  ${CYAN}%-20s${NC} %s\n" "supabase" "Supabase backend-as-a-service"
+    printf "  ${CYAN}%-20s${NC} %s\n" "firebase" "Firebase apps and services"
+    printf "  ${CYAN}%-20s${NC} %s\n" "slack" "Slack messaging integration"
+    printf "  ${CYAN}%-20s${NC} %s\n" "linear" "Linear issue tracking"
+    printf "  ${CYAN}%-20s${NC} %s\n" "stripe" "Stripe payments integration"
+    echo ""
+
+    echo -e "${BOLD}Included Workflow Skills (installed with this repo):${NC}"
+    echo ""
+    printf "  ${MAGENTA}%-25s${NC} %s\n" "deploy-pipeline" "CI/CD + Docker + Cloud provider deployment"
+    printf "  ${MAGENTA}%-25s${NC} %s\n" "observability-setup" "Monitoring + Logging + Alerting stack"
+    printf "  ${MAGENTA}%-25s${NC} %s\n" "infrastructure-as-code" "Terraform + Networking + Cloud IaC"
+    printf "  ${MAGENTA}%-25s${NC} %s\n" "security-hardening" "Security audit + CVE fix + Compliance"
+    printf "  ${MAGENTA}%-25s${NC} %s\n" "full-stack-scaffold" "Project scaffolding with API + DB + Frontend"
+    echo ""
+
+    echo -e "${BOLD}How to install plugins:${NC}"
+    echo ""
+    echo "  1. Enable the superpowers plugin:"
+    echo "     claude config set enabledPlugins.superpowers@claude-plugins-official true"
+    echo ""
+    echo "  2. External plugins (github, slack, etc.) are installed via Claude Code:"
+    echo "     claude /plugins"
+    echo ""
+    echo "  3. Workflow skills from this repo are installed automatically with:"
+    echo "     ./scripts/claude-agents-cli.sh install"
+    echo ""
+
+    echo -e "${BOLD}Integration with superpowers:${NC}"
+    echo ""
+    echo "  The workflow skills in this repo complement superpowers:"
+    echo "  - Use superpowers:brainstorming BEFORE running a workflow skill"
+    echo "  - Use superpowers:writing-plans to create implementation plans"
+    echo "  - Use superpowers:verification-before-completion to validate results"
+    echo ""
+}
+
+# ============================================================================
 # PROXY
 # ============================================================================
 
@@ -463,6 +597,16 @@ cmd_uninstall() {
         log_info "Removed scripts"
     fi
 
+    if [[ -e "$GLOBAL_COMMANDS" ]]; then
+        rm -rf "$GLOBAL_COMMANDS"
+        log_info "Removed commands"
+    fi
+
+    if [[ -e "$GLOBAL_SKILLS" ]]; then
+        rm -rf "$GLOBAL_SKILLS"
+        log_info "Removed skills"
+    fi
+
     # Keep config files by default
     log_warn "Config files preserved (keywords.json, settings.json)"
     log_info "Delete manually if needed: rm $CLAUDE_HOME/*.json"
@@ -490,6 +634,8 @@ main() {
         status)   cmd_status "$@" ;;
         test)     cmd_test "$@" ;;
         proxy)    cmd_proxy "$@" ;;
+        obsidian) cmd_obsidian "$@" ;;
+        plugins)  cmd_plugins "$@" ;;
         uninstall) cmd_uninstall "$@" ;;
         help|--help|-h) show_help ;;
         *)

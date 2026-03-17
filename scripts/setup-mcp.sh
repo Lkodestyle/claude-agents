@@ -59,6 +59,26 @@ log_info "Agregando: supabase (base de datos)"
 claude mcp add --transport http supabase https://mcp.supabase.com/mcp
 
 echo ""
+
+# Obsidian Vault (optional)
+echo ""
+log_step "Obsidian Vault MCP (optional)"
+echo ""
+read -r -p "Do you have an Obsidian vault to connect? (y/N) " setup_obsidian
+
+if [[ "$setup_obsidian" == "y" || "$setup_obsidian" == "Y" ]]; then
+    read -r -p "Enter vault path (e.g., ~/brain-vault): " vault_path
+    vault_path="${vault_path/#\~/$HOME}"
+
+    if [[ -d "$vault_path" ]]; then
+        log_info "Agregando: obsidian-vault (knowledge base)"
+        claude mcp add obsidian-vault -- npx @bitbonsai/mcpvault@latest "$vault_path"
+    else
+        log_warn "Path not found: $vault_path (skipping)"
+    fi
+fi
+
+echo ""
 log_step "Verificando instalación..."
 echo ""
 claude mcp list

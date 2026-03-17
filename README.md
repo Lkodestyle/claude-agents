@@ -61,6 +61,58 @@ cd ~/claude-agents
 | `/debug` | Help debug errors | `/debug "TypeError: cannot read..."` |
 | `/doc` | Generate documentation | `/doc src/api/` |
 
+## Workflow Skills
+
+Complete end-to-end workflows that orchestrate multiple agents together. Installed automatically with `claude-agents-cli.sh install`.
+
+| Skill | Agents Used | Description |
+|-------|-------------|-------------|
+| `deploy-pipeline` | cicd, docker, aws/azure, networking, security | Full CI/CD pipeline: Dockerfile + workflow + cloud deploy + IaC |
+| `observability-setup` | monitoring, aws/azure, kubernetes | Metrics + logging + alerting + dashboards + SLOs |
+| `infrastructure-as-code` | terraform, networking, aws/azure, security, architecture | VPC design + Terraform modules + multi-environment IaC |
+| `security-hardening` | security, docker, cicd, aws/azure, kubernetes | Dependency audit + secrets scan + container hardening + pipeline security |
+| `full-stack-scaffold` | architecture, web/mobile, databases, programming, docker | Project scaffolding: API + DB + frontend + Docker Compose + tests |
+
+## Recommended Plugins
+
+### Essential
+
+| Plugin | Description | Install |
+|--------|-------------|---------|
+| `superpowers` | 14 workflow skills: brainstorming, TDD, debugging, plans, code review, parallel agents | `claude config set enabledPlugins.superpowers@claude-plugins-official true` |
+| `skill-creator` | Create and test custom skills with eval framework | Via `/plugins` in Claude Code |
+| `context7` | Up-to-date library/framework documentation | Included in `.mcp.json` |
+
+### Optional (by use case)
+
+| Plugin | Use Case |
+|--------|----------|
+| `github` / `gitlab` | Repos, PRs, issues, code review automation |
+| `playwright` | E2E browser testing |
+| `supabase` | Backend-as-a-service |
+| `firebase` | Firebase apps and services |
+| `slack` | Messaging, bug reports, notifications |
+| `linear` | Issue tracking |
+| `stripe` | Payments integration |
+
+### Superpowers + Workflow Skills Integration
+
+The workflow skills complement superpowers for complete development flows:
+
+```
+superpowers:brainstorming → Refine requirements
+    ↓
+superpowers:writing-plans → Create implementation plan
+    ↓
+Workflow Skill (deploy-pipeline, etc.) → Execute the work
+    ↓
+superpowers:verification-before-completion → Validate results
+    ↓
+superpowers:requesting-code-review → Review before merge
+```
+
+List all recommended plugins: `./scripts/claude-agents-cli.sh plugins`
+
 ## Cognitive Features
 
 Inspired by [claude-cognitive](https://github.com/GMaN1911/claude-cognitive), this repo includes intelligent context management.
@@ -183,6 +235,24 @@ Pre-configured MCP servers in `.mcp.json`:
 | `context7` | Up-to-date library documentation | Add "use context7" to prompts |
 | `supabase` | Supabase project interaction | OAuth (automatic) |
 | `notion` | Notion workspace access | `NOTION_TOKEN` env var |
+| `obsidian-vault` | Obsidian vault read/write/search | `./scripts/setup-obsidian.sh` |
+
+### Obsidian Vault Setup
+
+Integrate your Obsidian vault as a knowledge base for Claude Code:
+
+```bash
+# Interactive setup
+./scripts/setup-obsidian.sh
+
+# Or with path directly
+./scripts/setup-obsidian.sh ~/my-vault
+
+# Or via CLI
+./scripts/claude-agents-cli.sh obsidian
+```
+
+The [obsidian-vault MCP](https://www.npmjs.com/package/@bitbonsai/mcpvault) provides tools to read, write, search notes, manage tags, and browse your vault structure directly from Claude Code.
 
 ### Setup
 
@@ -217,7 +287,7 @@ go install github.com/tbxark/mcp-proxy@latest
 ./scripts/claude-agents-cli.sh <command> [options]
 
 Commands:
-  install     Install agents and scripts
+  install     Install agents, commands, skills, and scripts
               --symlink   Use symlinks (default, auto-updates)
               --copy      Copy files (independent)
               --global    Install to ~/.claude (default)
@@ -225,14 +295,18 @@ Commands:
 
   sync        Sync config after git pull (for --copy installs)
 
-  status      Show installation status and agent list
+  status      Show installation status (agents, commands, skills)
 
   test        Test context router and pool coordinator
 
   proxy       Start mcp-proxy server
               --background  Run in background
 
-  uninstall   Remove installed agents and scripts
+  obsidian    Setup Obsidian Vault MCP server
+
+  plugins     Show recommended plugins and installation guide
+
+  uninstall   Remove installed agents, commands, skills, and scripts
 
   help        Show help message
 ```
@@ -276,6 +350,7 @@ Add to `.claude/settings.json`:
 | `CLAUDE_INSTANCE` | Instance ID for pool coordination (A, B, C...) | No |
 | `NOTION_TOKEN` | Notion integration token | For Notion MCP |
 | `GITHUB_TOKEN` | GitHub personal access token | For GitHub MCP |
+| `OBSIDIAN_VAULT_PATH` | Path to Obsidian vault | For Obsidian MCP |
 | `MCP_PROXY_TOKEN` | Token for mcp-proxy auth | For mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Token limit for MCP (default: 25000) | No |
 
@@ -314,6 +389,12 @@ claude-agents/
 │   │   ├── refactor.md
 │   │   ├── review.md
 │   │   └── test.md
+│   ├── skills/               # Workflow skills
+│   │   ├── deploy-pipeline/
+│   │   ├── observability-setup/
+│   │   ├── infrastructure-as-code/
+│   │   ├── security-hardening/
+│   │   └── full-stack-scaffold/
 │   ├── scripts/              # Cognitive scripts
 │   │   ├── context-router.py
 │   │   ├── memory-manager.py
@@ -361,6 +442,48 @@ Create `CLAUDE.local.md` in any project for local context (not committed):
 - Environment: Production US-East-1
 - Special requirements: PCI compliance
 ```
+
+## Best Practices
+
+Tips from the Claude Code team for getting the most out of this setup:
+
+**1. Verification is the #1 tip** — Give Claude a way to verify its work (tests, linters, browser). This 2-3x the quality of the output. Use `superpowers:verification-before-completion`.
+
+**2. Git worktrees for parallel work** — Run 3-5 Claude instances, each in its own worktree:
+```bash
+git worktree add .claude/worktrees/feature-a origin/main
+cd .claude/worktrees/feature-a && claude
+```
+
+**3. Start in Plan Mode** — Invest in the plan first (`shift+tab` twice), then switch to auto-accept. Claude can often 1-shot the implementation from a good plan.
+
+**4. Keep CLAUDE.md alive** — After every correction, tell Claude: *"Update CLAUDE.md so you don't make that mistake again."* The error rate drops measurably over time.
+
+**5. Slash commands for repetitive work** — If you do something more than once a day, make it a command in `.claude/commands/`.
+
+**6. PostToolUse hook for formatting** — Auto-format after every Write/Edit to prevent CI failures:
+```json
+"PostToolUse": [{
+  "matcher": "Write|Edit",
+  "hooks": [{ "type": "command", "command": "npx prettier --write \"$(jq -r '.tool_input.file_path')\" || true" }]
+}]
+```
+
+**7. Pre-approve safe permissions** — Use `/permissions` to allow common safe commands instead of `--dangerously-skip-permissions`. Commit them in `settings.json`.
+
+**8. Challenge Claude** — "Implement the elegant solution" beats accepting the first fix. "Prove to me this works" forces verification.
+
+**9. Use subagents for more compute** — Add "use subagents" to requests when you want Claude to throw more compute at the problem.
+
+**10. PostCompact hook** — Reinject critical instructions when context gets compacted:
+```json
+"PostCompact": [{
+  "matcher": "",
+  "hooks": [{ "type": "command", "command": "cat CLAUDE.md | head -50" }]
+}]
+```
+
+> Source: [How Boris Uses Claude Code](https://howborisusesclaudecode.com) — Boris Cherny, creator of Claude Code at Anthropic.
 
 ## References
 

@@ -116,7 +116,35 @@ Los agentes se activan **automaticamente** basandose en el contexto de la conver
 ### Ver agentes disponibles
 Ejecuta `/agents` en Claude Code para ver y gestionar los agentes.
 
-## Comandos (Skills)
+## Workflow Skills
+
+Este repositorio incluye **5 workflow skills** que orquestan multiples agentes para flujos completos:
+
+| Skill | Agentes | Descripcion |
+|-------|---------|-------------|
+| `deploy-pipeline` | cicd, docker, aws/azure, networking, security | Pipeline CI/CD completo: Dockerfile + workflow + cloud deploy |
+| `observability-setup` | monitoring, aws/azure, kubernetes | Stack de monitoring: metricas + logging + alerting + dashboards |
+| `infrastructure-as-code` | terraform, networking, aws/azure, security, architecture | IaC completo: VPC + modulos Terraform + multi-ambiente |
+| `security-hardening` | security, docker, cicd, aws/azure | Audit de seguridad: dependencias + secrets + containers + pipeline |
+| `full-stack-scaffold` | architecture, web/mobile, databases, programming, docker | Scaffolding: API + DB + frontend + Docker Compose + tests |
+
+Los skills se instalan automaticamente con `claude-agents-cli.sh install` en `.claude/skills/`.
+
+### Integracion con Superpowers Plugin
+
+Los workflow skills complementan el plugin superpowers:
+
+```
+superpowers:brainstorming → Refinar requerimientos
+    ↓
+superpowers:writing-plans → Crear plan de implementacion
+    ↓
+Workflow Skill (deploy-pipeline, etc.) → Ejecutar el trabajo
+    ↓
+superpowers:verification-before-completion → Validar resultados
+```
+
+## Comandos (Slash Commands)
 
 Este repositorio incluye **8 comandos** listos para usar:
 
@@ -160,6 +188,30 @@ git add .
 /doc src/api/
 ```
 
+## Plugins Recomendados
+
+### Esenciales
+
+| Plugin | Descripcion |
+|--------|-------------|
+| `superpowers` | 14 skills de proceso: brainstorming, TDD, debugging, plans, code review, agents paralelos |
+| `skill-creator` | Crear y testear skills custom con framework de evaluacion |
+| `context7` | Documentacion contextual de librerias y frameworks via MCP |
+
+### Opcionales (segun stack)
+
+| Plugin | Caso de uso |
+|--------|-------------|
+| `github` / `gitlab` | Gestion de repos, PRs, issues |
+| `playwright` | Testing E2E de apps web |
+| `supabase` | Backend-as-a-service |
+| `slack` | Notificaciones y comunicacion |
+| `firebase` | Apps mobile/web con Firebase |
+| `linear` | Issue tracking |
+
+Para instalar: `claude config set enabledPlugins.superpowers@claude-plugins-official true`
+Para ver todos: `./scripts/claude-agents-cli.sh plugins`
+
 ## MCP Servers Incluidos
 
 Este repositorio incluye configuracion de MCP servers en `.mcp.json`:
@@ -170,6 +222,24 @@ Este repositorio incluye configuracion de MCP servers en `.mcp.json`:
 | `context7` | Documentacion actualizada de librerias (agrega "use context7" al prompt) | No |
 | `supabase` | Interaccion con proyectos Supabase | OAuth automatico |
 | `notion` | Acceso a workspaces de Notion | `NOTION_TOKEN` env var |
+| `obsidian-vault` | Lectura/escritura/busqueda en vault de Obsidian | `./scripts/setup-obsidian.sh` |
+
+### Obsidian Vault
+
+Integra tu vault de Obsidian como knowledge base para Claude Code:
+
+```bash
+# Setup interactivo
+./scripts/setup-obsidian.sh
+
+# O con path directo
+./scripts/setup-obsidian.sh ~/mi-vault
+
+# O via CLI
+./scripts/claude-agents-cli.sh obsidian
+```
+
+Herramientas disponibles: `read_note`, `write_note`, `search_notes`, `list_directory`, `get_vault_stats`, `manage_tags`.
 
 ### MCP Proxy (Opcional)
 
@@ -312,7 +382,7 @@ claude-agents/
 │   │   ├── docker.md
 │   │   ├── finops.md
 │   │   └── security.md
-│   ├── commands/             # Comandos/Skills
+│   ├── commands/             # Slash Commands
 │   │   ├── commit.md         # /commit - Conventional commits
 │   │   ├── pr.md             # /pr - Create pull request
 │   │   ├── review.md         # /review - Code review
@@ -321,6 +391,12 @@ claude-agents/
 │   │   ├── refactor.md       # /refactor - Suggest refactoring
 │   │   ├── debug.md          # /debug - Debug errors
 │   │   └── doc.md            # /doc - Generate docs
+│   ├── skills/               # Workflow Skills
+│   │   ├── deploy-pipeline/  # CI/CD + Docker + Cloud
+│   │   ├── observability-setup/ # Monitoring + Logging + Alerting
+│   │   ├── infrastructure-as-code/ # Terraform + Networking + Cloud
+│   │   ├── security-hardening/    # Security audit + fix + compliance
+│   │   └── full-stack-scaffold/   # Project scaffolding completo
 │   ├── scripts/              # Scripts utilitarios
 │   │   ├── context-router.py # Activacion inteligente
 │   │   ├── pool-loader.py    # Carga estado de pool
@@ -332,7 +408,9 @@ claude-agents/
 │   └── settings.json         # Config de hooks
 ├── scripts/
 │   ├── install.sh            # Instalador legacy
-│   └── claude-agents-cli.sh  # CLI completo (v2)
+│   ├── claude-agents-cli.sh  # CLI completo (v3)
+│   ├── setup-mcp.sh          # Setup de MCP servers
+│   └── setup-obsidian.sh     # Setup de Obsidian vault MCP
 ├── templates/                # Templates reutilizables
 └── agents/                   # Versiones originales (referencia)
 ```
@@ -441,6 +519,7 @@ Para mas info sobre hooks, ejecuta `/hooks` en Claude Code.
 | `CLAUDE_INSTANCE` | ID de instancia (A, B, C...) para coordinacion | No |
 | `NOTION_TOKEN` | Token de integracion de Notion | Para MCP Notion |
 | `GITHUB_TOKEN` | Personal Access Token de GitHub | Para MCP GitHub |
+| `OBSIDIAN_VAULT_PATH` | Path al vault de Obsidian | Para MCP Obsidian |
 | `MCP_PROXY_TOKEN` | Token para mcp-proxy | Para mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Limite de tokens para MCP (default: 25000) | No |
 
