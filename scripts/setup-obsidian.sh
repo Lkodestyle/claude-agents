@@ -65,6 +65,13 @@ fi
 
 log_info "Vault found: $VAULT_PATH"
 
+# Pre-install the MCP package
+log_step "Installing @bitbonsai/mcpvault..."
+npx -y @bitbonsai/mcpvault@latest --help > /dev/null 2>&1 || {
+    log_warn "Could not verify mcpvault package. It will be downloaded on first use."
+}
+log_info "mcpvault package ready"
+
 # Determine MCP config location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
@@ -93,7 +100,7 @@ servers = config.get('mcpServers', {})
 servers['obsidian-vault'] = {
     'type': 'stdio',
     'command': 'npx',
-    'args': ['@bitbonsai/mcpvault@latest', vault_path]
+    'args': ['-y', '@bitbonsai/mcpvault@latest', vault_path]
 }
 
 config['mcpServers'] = servers
@@ -133,7 +140,7 @@ servers = config.get('mcpServers', {})
 servers['obsidian-vault'] = {
     'type': 'stdio',
     'command': 'npx',
-    'args': ['@bitbonsai/mcpvault@latest', vault_path]
+    'args': ['-y', '@bitbonsai/mcpvault@latest', vault_path]
 }
 
 config['mcpServers'] = servers

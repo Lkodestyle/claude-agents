@@ -26,9 +26,8 @@
     "obsidian-vault": {
       "type": "stdio",
       "command": "npx",
-      "args": ["@bitbonsai/mcpvault@latest", "${OBSIDIAN_VAULT_PATH:-~/obsidian-vault}"],
-      "disabled": true,
-      "_setup": "Run ./scripts/setup-obsidian.sh to configure with your vault path"
+      "args": ["-y", "@bitbonsai/mcpvault@latest", "${OBSIDIAN_VAULT_PATH:-~/obsidian-vault}"],
+      "disabled": true
     }
   },
 

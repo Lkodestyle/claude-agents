@@ -1,7 +1,4 @@
 {
-  "$schema": "https://claude.ai/schemas/claude-code-settings.json",
-  "description": "Claude Code settings with cognitive hooks for intelligent agent activation",
-
   "hooks": {
     "UserPromptSubmit": [
       {
