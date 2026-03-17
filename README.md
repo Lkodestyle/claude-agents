@@ -18,15 +18,21 @@ A comprehensive collection of specialized AI agents for Claude Code, focused on 
 git clone https://github.com/Lkodestyle/claude-agents.git ~/claude-agents
 cd ~/claude-agents
 
-# Install with symlinks (recommended - auto-updates with git pull)
-./scripts/claude-agents-cli.sh install
+# Full setup (agents + MCP + Obsidian + plugins — interactive)
+./scripts/setup.sh
 
-# Or install with copy (independent of repo)
-./scripts/claude-agents-cli.sh install --copy
+# Or install only agents/commands/skills
+./scripts/claude-agents-cli.sh install
 
 # Verify installation
 ./scripts/claude-agents-cli.sh status
 ```
+
+The `setup.sh` script runs a complete onboarding in 4 steps:
+1. Install agents, commands, skills, and scripts (symlink or copy)
+2. Configure MCP servers (memory, context7, notion, supabase)
+3. Setup Obsidian vault with full structure (folders, templates, guides)
+4. Enable recommended plugins (superpowers, skill-creator)
 
 ## Agents
 
@@ -404,6 +410,7 @@ claude-agents/
 │   ├── keywords.json         # Keyword activation config
 │   └── settings.json         # Hooks configuration
 ├── scripts/
+│   ├── setup.sh              # Full onboarding (runs all setup steps)
 │   └── claude-agents-cli.sh  # CLI installer
 └── templates/                # Reusable templates
     ├── ecs-service/

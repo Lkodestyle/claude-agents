@@ -312,21 +312,28 @@ Para verificar el estado de los MCP servers, ejecuta `/mcp` en Claude Code.
 
 ## Instalacion
 
-### Opcion 1: CLI Tool (Recomendado)
+### Opcion 1: Setup Completo (Recomendado)
 
 ```bash
 # Clonar repositorio
 git clone <repo-url> ~/claude-agents
 cd ~/claude-agents
 
+# Setup completo interactivo (agentes + MCP + Obsidian + plugins)
+./scripts/setup.sh
+
+# Ver estado de instalacion
+./scripts/claude-agents-cli.sh status
+```
+
+### Opcion 2: Solo agentes/commands/skills
+
+```bash
 # Instalar con symlinks (auto-actualiza con git pull)
 ./scripts/claude-agents-cli.sh install
 
 # O copiar archivos (independiente del repo)
 ./scripts/claude-agents-cli.sh install --copy
-
-# Ver estado de instalacion
-./scripts/claude-agents-cli.sh status
 
 # Probar configuracion
 ./scripts/claude-agents-cli.sh test
