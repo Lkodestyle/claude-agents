@@ -18,6 +18,8 @@ const (
 func main() {
 	log.SetOutput(os.Stderr) // stdio transport owns stdout; never log there.
 
+	loadDotEnv() // fill in missing env vars from a nearby .env before resolving config
+
 	dataDir := resolveDataDir()
 	docEmbed, queryEmbed, embedLabel := resolveEmbedFunc()
 

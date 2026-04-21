@@ -40,8 +40,8 @@
         "JARVIS_OLLAMA_URL": "${JARVIS_OLLAMA_URL:-}",
         "JARVIS_USE_OPENAI": "${JARVIS_USE_OPENAI:-false}"
       },
-      "disabled": true,
-      "_comment": "Jarvis mode core. Build with ./scripts/build-jarvis-memory.sh. Provider priority: Voyage (VOYAGE_API_KEY) > OpenAI (JARVIS_USE_OPENAI=true + OPENAI_API_KEY) > Ollama (default). Flip disabled:false to activate."
+      "disabled": false,
+      "_comment": "Jarvis mode core. Build with ./scripts/build-jarvis-memory.sh. Provider priority: Voyage (VOYAGE_API_KEY) > OpenAI (JARVIS_USE_OPENAI=true + OPENAI_API_KEY) > Ollama (default). Binary auto-loads .env from repo root or ~/.jarvis/.env."
     }
   },
 
