@@ -28,6 +28,20 @@
       "command": "npx",
       "args": ["-y", "@bitbonsai/mcpvault@latest", "${OBSIDIAN_VAULT_PATH:-~/obsidian-vault}"],
       "disabled": true
+    },
+    "jarvis-memory": {
+      "type": "stdio",
+      "command": "${JARVIS_MEMORY_BIN:-./bin/jarvis-memory}",
+      "env": {
+        "JARVIS_DATA_DIR": "${JARVIS_DATA_DIR:-~/.jarvis/memory}",
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY:-}",
+        "JARVIS_VOYAGE_MODEL": "${JARVIS_VOYAGE_MODEL:-voyage-3.5-lite}",
+        "JARVIS_EMBED_MODEL": "${JARVIS_EMBED_MODEL:-nomic-embed-text}",
+        "JARVIS_OLLAMA_URL": "${JARVIS_OLLAMA_URL:-}",
+        "JARVIS_USE_OPENAI": "${JARVIS_USE_OPENAI:-false}"
+      },
+      "disabled": true,
+      "_comment": "Jarvis mode core. Build with ./scripts/build-jarvis-memory.sh. Provider priority: Voyage (VOYAGE_API_KEY) > OpenAI (JARVIS_USE_OPENAI=true + OPENAI_API_KEY) > Ollama (default). Flip disabled:false to activate."
     }
   },
 
