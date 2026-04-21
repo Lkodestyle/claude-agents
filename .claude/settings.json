@@ -8,6 +8,11 @@
             "type": "command",
             "command": "python3 .claude/scripts/context-router.py",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/jarvis-mode-prompt.py",
+            "timeout": 2000
           }
         ]
       }
@@ -58,7 +63,8 @@
       "WebSearch(*)",
       "mcp__memory__*",
       "mcp__context7__*",
-      "mcp__notion__*"
+      "mcp__notion__*",
+      "mcp__jarvis-memory__*"
     ],
     "deny": [
       "Bash(rm -rf /)",
