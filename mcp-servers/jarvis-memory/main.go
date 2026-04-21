@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/philippgille/chromem-go"
@@ -17,6 +19,11 @@ const (
 
 func main() {
 	log.SetOutput(os.Stderr) // stdio transport owns stdout; never log there.
+
+	// Heartbeat: write a trace file on every launch so we can confirm the MCP
+	// client is actually spawning us (useful when the stdio transport swallows
+	// stderr and the client UI reports no server at all).
+	writeLaunchTrace()
 
 	loadDotEnv() // fill in missing env vars from a nearby .env before resolving config
 
@@ -58,6 +65,33 @@ func main() {
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("server exited: %v", err)
 	}
+}
+
+// writeLaunchTrace appends a timestamped line to ~/.jarvis/launches.log.
+// Best-effort; failures are logged to stderr but never abort startup.
+func writeLaunchTrace() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	dir := filepath.Join(home, ".jarvis")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Printf("launch trace mkdir: %v", err)
+		return
+	}
+	path := filepath.Join(dir, "launches.log")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Printf("launch trace open: %v", err)
+		return
+	}
+	defer f.Close()
+
+	cwd, _ := os.Getwd()
+	exe, _ := os.Executable()
+	line := fmt.Sprintf("%s pid=%d cwd=%q exe=%q\n",
+		time.Now().UTC().Format(time.RFC3339), os.Getpid(), cwd, exe)
+	_, _ = f.WriteString(line)
 }
 
 func resolveDataDir() string {
