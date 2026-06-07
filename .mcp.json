@@ -23,11 +23,16 @@
         "NOTION_TOKEN": "${NOTION_TOKEN}"
       }
     },
-    "obsidian-vault": {
+    "obsidian": {
+      "type": "http",
+      "url": "http://127.0.0.1:27123/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${OBSIDIAN_API_KEY}"
+      }
+    },
+    "jarvis-memory": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@bitbonsai/mcpvault@latest", "${OBSIDIAN_VAULT_PATH:-~/obsidian-vault}"],
-      "disabled": true
+      "command": "C:\\Users\\lucri\\OneDrive\\Escritorio\\claude-code\\claude-agents\\claude-agents\\bin\\jarvis-memory.exe"
     }
   },
 

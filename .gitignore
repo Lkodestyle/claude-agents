@@ -14,6 +14,11 @@ memory.db-journal
 memory.db-shm
 memory.db-wal
 
+# Jarvis
+bin/
+.jarvis-smoke/
+.jarvis/
+
 # OS files
 .DS_Store
 Thumbs.db
