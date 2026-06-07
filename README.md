@@ -241,24 +241,31 @@ Pre-configured MCP servers in `.mcp.json`:
 | `context7` | Up-to-date library documentation | Add "use context7" to prompts |
 | `supabase` | Supabase project interaction | OAuth (automatic) |
 | `notion` | Notion workspace access | `NOTION_TOKEN` env var |
-| `obsidian-vault` | Obsidian vault read/write/search | `./scripts/setup-obsidian.sh` |
+| `obsidian` | Obsidian vault read/write/search | `OBSIDIAN_API_KEY` + Local REST API plugin |
 
 ### Obsidian Vault Setup
 
-Integrate your Obsidian vault as a knowledge base for Claude Code:
+Integrates your Obsidian vault via the **Local REST API** plugin (native MCP endpoint):
 
+**1. Install the plugin in Obsidian:**
+- Settings → Community Plugins → search **"Local REST API"** → Install & Enable
+
+**2. Enable HTTP server:**
+- Settings → Local REST API → enable **"Enable HTTP server"**
+
+**3. Copy your API key** from that same settings screen
+
+**4. Set the environment variable:**
 ```bash
-# Interactive setup
-./scripts/setup-obsidian.sh
-
-# Or with path directly
-./scripts/setup-obsidian.sh ~/my-vault
-
-# Or via CLI
-./scripts/claude-agents-cli.sh obsidian
+export OBSIDIAN_API_KEY="your_api_key_here"
 ```
 
-The [obsidian-vault MCP](https://www.npmjs.com/package/@bitbonsai/mcpvault) provides tools to read, write, search notes, manage tags, and browse your vault structure directly from Claude Code.
+The MCP server runs at `http://127.0.0.1:27123/mcp/` while Obsidian is open. No vault path needed — the plugin exposes whichever vault is currently loaded.
+
+To create the recommended vault folder structure (inbox, projects, areas, etc.):
+```bash
+./scripts/setup-obsidian.sh
+```
 
 ### Setup
 
@@ -356,7 +363,7 @@ Add to `.claude/settings.json`:
 | `CLAUDE_INSTANCE` | Instance ID for pool coordination (A, B, C...) | No |
 | `NOTION_TOKEN` | Notion integration token | For Notion MCP |
 | `GITHUB_TOKEN` | GitHub personal access token | For GitHub MCP |
-| `OBSIDIAN_VAULT_PATH` | Path to Obsidian vault | For Obsidian MCP |
+| `OBSIDIAN_API_KEY` | API key from Local REST API plugin | For Obsidian MCP |
 | `MCP_PROXY_TOKEN` | Token for mcp-proxy auth | For mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Token limit for MCP (default: 25000) | No |
 

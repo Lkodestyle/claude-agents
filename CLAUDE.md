@@ -222,24 +222,23 @@ Este repositorio incluye configuracion de MCP servers en `.mcp.json`:
 | `context7` | Documentacion actualizada de librerias (agrega "use context7" al prompt) | No |
 | `supabase` | Interaccion con proyectos Supabase | OAuth automatico |
 | `notion` | Acceso a workspaces de Notion | `NOTION_TOKEN` env var |
-| `obsidian-vault` | Lectura/escritura/busqueda en vault de Obsidian | `./scripts/setup-obsidian.sh` |
+| `obsidian` | Lectura/escritura/busqueda en vault de Obsidian via Local REST API | `OBSIDIAN_API_KEY` env var |
 
 ### Obsidian Vault
 
-Integra tu vault de Obsidian como knowledge base para Claude Code:
+Integra tu vault de Obsidian via el plugin **Local REST API** (nativo en Obsidian):
+
+1. Instalar el plugin en Obsidian: Settings → Community Plugins → buscar "Local REST API"
+2. Activarlo y en Settings → Local REST API → habilitar **"Enable HTTP server"**
+3. Copiar la **API key** que aparece en la misma pantalla
+4. Configurar la variable de entorno:
 
 ```bash
-# Setup interactivo
-./scripts/setup-obsidian.sh
-
-# O con path directo
-./scripts/setup-obsidian.sh ~/mi-vault
-
-# O via CLI
-./scripts/claude-agents-cli.sh obsidian
+# Agregar a ~/.bashrc, ~/.zshrc, o variables de entorno de Windows
+export OBSIDIAN_API_KEY="tu_api_key_aqui"
 ```
 
-Herramientas disponibles: `read_note`, `write_note`, `search_notes`, `list_directory`, `get_vault_stats`, `manage_tags`.
+El servidor MCP corre en `http://127.0.0.1:27123/mcp/` mientras Obsidian esté abierto.
 
 ### MCP Proxy (Opcional)
 
@@ -526,7 +525,7 @@ Para mas info sobre hooks, ejecuta `/hooks` en Claude Code.
 | `CLAUDE_INSTANCE` | ID de instancia (A, B, C...) para coordinacion | No |
 | `NOTION_TOKEN` | Token de integracion de Notion | Para MCP Notion |
 | `GITHUB_TOKEN` | Personal Access Token de GitHub | Para MCP GitHub |
-| `OBSIDIAN_VAULT_PATH` | Path al vault de Obsidian | Para MCP Obsidian |
+| `OBSIDIAN_API_KEY` | API key del plugin Local REST API de Obsidian | Para MCP Obsidian |
 | `MCP_PROXY_TOKEN` | Token para mcp-proxy | Para mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Limite de tokens para MCP (default: 25000) | No |
 
