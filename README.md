@@ -66,10 +66,21 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 | `/refactor` | Suggest and apply refactoring | `/refactor src/legacy.ts` |
 | `/debug` | Help debug errors | `/debug "TypeError: cannot read..."` |
 | `/doc` | Generate documentation | `/doc src/api/` |
+| `/jarvis` | Toggle Jarvis personality mode (on/off/status) | `/jarvis on` |
 
-## Workflow Skills
+## Skills
 
-Complete end-to-end workflows that orchestrate multiple agents together. Installed automatically with `claude-agents-cli.sh install`.
+Installed automatically with `claude-agents-cli.sh install` into `~/.claude/skills/`.
+
+### Routing Guide
+
+| Skill | Purpose |
+|-------|---------|
+| `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains proactive invocation via the Task tool. Use it at the start of any technical task. |
+
+### Workflow Skills
+
+Complete end-to-end workflows that orchestrate multiple agents together.
 
 | Skill | Agents Used | Description |
 |-------|-------------|-------------|
@@ -398,11 +409,13 @@ claude-agents/
 │   │   ├── debug.md
 │   │   ├── doc.md
 │   │   ├── explain.md
+│   │   ├── jarvis.md
 │   │   ├── pr.md
 │   │   ├── refactor.md
 │   │   ├── review.md
 │   │   └── test.md
-│   ├── skills/               # Workflow skills
+│   ├── skills/               # Skills (routing guide + workflows)
+│   │   ├── agents-hub/           # Agent routing guide (entry point)
 │   │   ├── deploy-pipeline/
 │   │   ├── observability-setup/
 │   │   ├── infrastructure-as-code/

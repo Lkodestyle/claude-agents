@@ -118,10 +118,11 @@ Ejecuta `/agents` en Claude Code para ver y gestionar los agentes.
 
 ## Workflow Skills
 
-Este repositorio incluye **5 workflow skills** que orquestan multiples agentes para flujos completos:
+Este repositorio incluye una **skill guia** (`agents-hub`) mas **5 workflow skills** que orquestan multiples agentes para flujos completos:
 
 | Skill | Agentes | Descripcion |
 |-------|---------|-------------|
+| `agents-hub` | todos | Guia de routing: punto de entrada para elegir e invocar el agente correcto de forma proactiva (usar al inicio de cualquier tarea) |
 | `deploy-pipeline` | cicd, docker, aws/azure, networking, security | Pipeline CI/CD completo: Dockerfile + workflow + cloud deploy |
 | `observability-setup` | monitoring, aws/azure, kubernetes | Stack de monitoring: metricas + logging + alerting + dashboards |
 | `infrastructure-as-code` | terraform, networking, aws/azure, security, architecture | IaC completo: VPC + modulos Terraform + multi-ambiente |
@@ -146,7 +147,7 @@ superpowers:verification-before-completion → Validar resultados
 
 ## Comandos (Slash Commands)
 
-Este repositorio incluye **8 comandos** listos para usar:
+Este repositorio incluye **9 comandos** listos para usar:
 
 | Comando | Descripcion | Uso |
 |---------|-------------|-----|
@@ -158,6 +159,7 @@ Este repositorio incluye **8 comandos** listos para usar:
 | `/refactor` | Sugiere y aplica refactoring | `/refactor src/legacy.ts` |
 | `/debug` | Ayuda a debuggear errores | `/debug "TypeError: cannot read..."` |
 | `/doc` | Genera documentacion (README, JSDoc, docstrings) | `/doc src/api/` |
+| `/jarvis` | Activa/desactiva el modo de personalidad Jarvis | `/jarvis on` |
 
 ### Ejemplos de Uso
 
@@ -396,8 +398,10 @@ claude-agents/
 │   │   ├── explain.md        # /explain - Explain code
 │   │   ├── refactor.md       # /refactor - Suggest refactoring
 │   │   ├── debug.md          # /debug - Debug errors
-│   │   └── doc.md            # /doc - Generate docs
-│   ├── skills/               # Workflow Skills
+│   │   ├── doc.md            # /doc - Generate docs
+│   │   └── jarvis.md         # /jarvis - Toggle Jarvis mode
+│   ├── skills/               # Skills (guia + workflows)
+│   │   ├── agents-hub/       # Guia de routing de agentes (entry point)
 │   │   ├── deploy-pipeline/  # CI/CD + Docker + Cloud
 │   │   ├── observability-setup/ # Monitoring + Logging + Alerting
 │   │   ├── infrastructure-as-code/ # Terraform + Networking + Cloud
@@ -417,8 +421,7 @@ claude-agents/
 │   ├── claude-agents-cli.sh  # CLI completo (v3)
 │   ├── setup-mcp.sh          # Setup de MCP servers
 │   └── setup-obsidian.sh     # Setup de Obsidian vault MCP
-├── templates/                # Templates reutilizables
-└── agents/                   # Versiones originales (referencia)
+└── templates/                # Templates reutilizables
 ```
 
 ## Hooks de Claude Code
