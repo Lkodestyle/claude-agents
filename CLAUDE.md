@@ -452,7 +452,10 @@ Este repositorio configura automaticamente los siguientes hooks en `.claude/sett
 
 ### Configuracion de Hooks
 
-Los hooks se configuran en `.claude/settings.json` o `~/.claude/settings.json`:
+Los hooks se configuran en `.claude/settings.json` (proyecto) o `~/.claude/settings.json` (global).
+
+Para hooks **de proyecto**, usa `${CLAUDE_PROJECT_DIR}` para que la ruta resuelva sin
+depender del directorio actual:
 
 ```json
 {
@@ -463,7 +466,7 @@ Los hooks se configuran en `.claude/settings.json` o `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/context-router.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/context-router.py\"",
             "timeout": 5000
           }
         ]
@@ -471,6 +474,14 @@ Los hooks se configuran en `.claude/settings.json` o `~/.claude/settings.json`:
     ]
   }
 }
+```
+
+Para una instalacion **global**, el instalador (`claude-agents-cli.sh install`) genera el
+`~/.claude/settings.json` con **rutas absolutas** al directorio de scripts y el binario de
+Python detectado (`python3`/`python`/`py -3`), por ejemplo:
+
+```json
+"command": "python3 \"/home/usuario/.claude/scripts/context-router.py\""
 ```
 
 ### Ejemplos Utiles
