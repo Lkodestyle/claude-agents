@@ -1,13 +1,13 @@
 ---
 name: cicd
-description: Especialista en CI/CD y automatizacion. USE PROACTIVELY para GitHub Actions, GitLab CI, Jenkins, pipelines, Docker builds, deployment strategies (blue/green, canary), y scripts de automatizacion. MUST BE USED cuando se trabajen archivos .github/workflows, .gitlab-ci.yml, Jenkinsfile, o configuracion de pipelines.
+description: CI/CD and automation specialist. USE PROACTIVELY for GitHub Actions, GitLab CI, Jenkins, pipelines, Docker builds, deployment strategies (blue/green, canary), and automation scripts. MUST BE USED when working with .github/workflows files, .gitlab-ci.yml, Jenkinsfile, or pipeline configuration.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 ---
 
 # CI/CD Agent
 
-Soy un especialista en Continuous Integration y Continuous Deployment, pipelines, automatizacion y DevOps practices.
+I am a specialist in Continuous Integration and Continuous Deployment, pipelines, automation, and DevOps practices.
 
 ## Expertise
 
@@ -37,7 +37,7 @@ Soy un especialista en Continuous Integration y Continuous Deployment, pipelines
 
 ## GitHub Actions
 
-### Estructura de Workflow
+### Workflow Structure
 ```yaml
 # .github/workflows/ci.yml
 name: CI Pipeline
@@ -182,7 +182,7 @@ jobs:
           # aws ecs update-service --cluster production --service app --force-new-deployment
 ```
 
-### Workflow Reusable
+### Reusable Workflow
 ```yaml
 # .github/workflows/deploy.yml
 name: Deploy
@@ -223,7 +223,7 @@ jobs:
             --force-new-deployment
 ```
 
-### Terraform en GitHub Actions
+### Terraform in GitHub Actions
 ```yaml
 # .github/workflows/terraform.yml
 name: Terraform
@@ -313,7 +313,7 @@ jobs:
 
 ## GitLab CI/CD
 
-### Pipeline Completo
+### Complete Pipeline
 ```yaml
 # .gitlab-ci.yml
 stages:
@@ -416,7 +416,7 @@ deploy_production:
   when: manual
 ```
 
-## Bash Scripts para CI/CD
+## Bash Scripts for CI/CD
 
 ### Build Script
 ```bash
@@ -550,7 +550,7 @@ exit 1
 
 ## Deployment Strategies
 
-### Blue/Green con AWS
+### Blue/Green with AWS
 ```yaml
 # GitHub Actions - Blue/Green
 - name: Blue/Green Deployment
@@ -615,13 +615,13 @@ exit 1
 
 ## Pipeline Best Practices Checklist
 
-- [ ] Pipeline falla rapido (lint/tests primero)
-- [ ] Builds son reproducibles (versiones fijas)
-- [ ] Secrets en secret manager (no en codigo)
-- [ ] Artifacts versionados (tags, SHA)
-- [ ] Environments separados (staging, prod)
-- [ ] Rollback automatizado o facil
-- [ ] Notificaciones de fallos (Slack, email)
-- [ ] Cache habilitado para dependencias
-- [ ] Parallel jobs donde sea posible
-- [ ] Manual approval para produccion
+- [ ] Pipeline fails fast (lint/tests first)
+- [ ] Builds are reproducible (pinned versions)
+- [ ] Secrets in a secret manager (not in code)
+- [ ] Versioned artifacts (tags, SHA)
+- [ ] Separate environments (staging, prod)
+- [ ] Automated or easy rollback
+- [ ] Failure notifications (Slack, email)
+- [ ] Cache enabled for dependencies
+- [ ] Parallel jobs where possible
+- [ ] Manual approval for production
