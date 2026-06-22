@@ -6,12 +6,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/context-router.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/context-router.py\"",
             "timeout": 5000
           },
           {
             "type": "command",
-            "command": "python3 .claude/scripts/jarvis-mode-prompt.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/jarvis-mode-prompt.py\"",
             "timeout": 2000
           }
         ]
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/pool-loader.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/pool-loader.py\"",
             "timeout": 3000
           }
         ]
@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/pool-extractor.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/pool-extractor.py\"",
             "timeout": 3000
           }
         ]

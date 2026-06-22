@@ -105,14 +105,74 @@ EOF
 # UTILITIES
 # ============================================================================
 
-check_python() {
+# Detected Python invocation (set by detect_python)
+PYTHON_BIN=""
+
+detect_python() {
+    # Prefer python3, then python, then the Windows launcher `py -3`.
     if command -v python3 &> /dev/null; then
-        log_info "Python3 found: $(python3 --version)"
-        return 0
+        PYTHON_BIN="python3"
+    elif command -v python &> /dev/null; then
+        PYTHON_BIN="python"
+    elif command -v py &> /dev/null; then
+        PYTHON_BIN="py -3"
     else
-        log_error "Python3 not found. Please install Python 3.8+"
+        log_error "Python not found. Please install Python 3.8+ (python3, python, or py)"
         return 1
     fi
+    log_info "Python found: $($PYTHON_BIN --version 2>&1) (using '$PYTHON_BIN')"
+    return 0
+}
+
+# Backwards-compatible alias used across the script.
+check_python() { detect_python; }
+
+# Generate an installed settings.json whose hook commands point at absolute
+# script paths under the install dir, using the detected Python interpreter.
+# This makes hooks resolve correctly for a GLOBAL install (any cwd) and is
+# portable across python3/python/py.
+install_settings() {
+    local install_dir="$1"
+    local src="$REPO_DIR/.claude/settings.json"
+    local dst="$install_dir/settings.json"
+
+    if [[ ! -f "$src" ]]; then
+        log_warn "Source settings.json not found, skipping"
+        return 0
+    fi
+
+    backup_if_exists "$dst"
+
+    PYTHON_BIN="$PYTHON_BIN" SCRIPTS_DIR="$install_dir/scripts" SRC="$src" DST="$dst" \
+        $PYTHON_BIN - <<'PYEOF'
+import json, os, re
+
+py = os.environ["PYTHON_BIN"]
+scripts_dir = os.environ["SCRIPTS_DIR"]
+src = os.environ["SRC"]
+dst = os.environ["DST"]
+
+with open(src, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+script_re = re.compile(r"([\w.-]+\.py)")
+
+for event in data.get("hooks", {}).values():
+    for matcher in event:
+        for hook in matcher.get("hooks", []):
+            if hook.get("type") != "command":
+                continue
+            m = script_re.search(hook.get("command", ""))
+            if not m:
+                continue
+            script_path = os.path.join(scripts_dir, m.group(1))
+            hook["command"] = f'{py} "{script_path}"'
+
+with open(dst, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+PYEOF
+    log_info "Settings generated with absolute hook paths -> $dst"
 }
 
 check_repo() {
@@ -235,12 +295,7 @@ cmd_install() {
         log_warn "keywords.json already exists, skipping"
     fi
 
-    if [[ ! -f "$install_dir/settings.json" ]]; then
-        cp "$REPO_DIR/.claude/settings.json" "$install_dir/settings.json"
-        log_info "Settings config installed"
-    else
-        log_warn "settings.json already exists, skipping"
-    fi
+    install_settings "$install_dir"
 
     # Install MCP config if global
     if [[ "$target" == "global" && ! -f "$HOME/.mcp.json" ]]; then
@@ -282,6 +337,11 @@ cmd_sync() {
     log_step "Syncing keywords.json..."
     cp "$REPO_DIR/.claude/keywords.json" "$CLAUDE_HOME/keywords.json"
     log_info "Keywords synced"
+
+    # Regenerate settings.json so hook paths stay correct after updates
+    log_step "Regenerating settings.json hook paths..."
+    detect_python
+    install_settings "$CLAUDE_HOME"
 
     log_header "Sync Complete!"
 }
@@ -428,7 +488,7 @@ cmd_test() {
 
     # Test context router
     log_step "Testing context router..."
-    if echo '{"prompt":"test terraform plan"}' | python3 "$GLOBAL_SCRIPTS/context-router.py" > /dev/null 2>&1; then
+    if echo '{"prompt":"test terraform plan"}' | $PYTHON_BIN "$GLOBAL_SCRIPTS/context-router.py" > /dev/null 2>&1; then
         log_info "Context router: OK"
     else
         log_error "Context router: FAILED"
@@ -437,7 +497,7 @@ cmd_test() {
 
     # Test pool loader
     log_step "Testing pool loader..."
-    if python3 "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
+    if $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
         log_info "Pool loader: OK"
     else
         log_error "Pool loader: FAILED"
@@ -446,7 +506,7 @@ cmd_test() {
 
     # Test pool query
     log_step "Testing pool query..."
-    if python3 "$GLOBAL_SCRIPTS/pool-query.py" --count > /dev/null 2>&1; then
+    if $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-query.py" --count > /dev/null 2>&1; then
         log_info "Pool query: OK"
     else
         log_error "Pool query: FAILED"
@@ -455,7 +515,7 @@ cmd_test() {
 
     # Test keyword activation
     log_step "Testing keyword activation..."
-    local output=$(echo '{"prompt":"help me with kubernetes deployment"}' | python3 "$GLOBAL_SCRIPTS/context-router.py" 2>/dev/null)
+    local output=$(echo '{"prompt":"help me with kubernetes deployment"}' | $PYTHON_BIN "$GLOBAL_SCRIPTS/context-router.py" 2>/dev/null)
     if echo "$output" | grep -q "kubernetes" 2>/dev/null; then
         log_info "Keyword activation: OK (kubernetes detected)"
     else
