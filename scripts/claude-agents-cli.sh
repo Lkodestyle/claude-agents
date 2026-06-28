@@ -133,6 +133,18 @@ check_python() { detect_python; }
 # portable across python3/python/py.
 install_settings() {
     local install_dir="$1"
+    # Token used to locate the hook scripts inside each hook command. It is kept
+    # LITERAL in the generated JSON (not expanded at install time) so the value
+    # resolves at hook runtime in whatever environment Claude Code runs the hook:
+    #   - global: '$HOME/.claude/scripts' -> sh expands $HOME (works in WSL AND
+    #     native-Windows Git Bash, where $HOME is the Windows user profile and
+    #     MSYS converts the arg to a Windows path for python3.exe).
+    #   - local:  '${CLAUDE_PROJECT_DIR}/.claude/scripts' -> expanded by Claude
+    #     Code itself to the native project path on each OS.
+    # This avoids baking an absolute OS-specific path (e.g. /home/<user>/...),
+    # which breaks when the same ~/.claude is shared (symlinked) between WSL and
+    # native Windows.
+    local hook_scripts="${2:-\$HOME/.claude/scripts}"
     local src="$REPO_DIR/.claude/settings.json"
     local dst="$install_dir/settings.json"
 
@@ -143,12 +155,12 @@ install_settings() {
 
     backup_if_exists "$dst"
 
-    PYTHON_BIN="$PYTHON_BIN" SCRIPTS_DIR="$install_dir/scripts" SRC="$src" DST="$dst" \
+    PYTHON_BIN="$PYTHON_BIN" HOOK_SCRIPTS="$hook_scripts" SRC="$src" DST="$dst" \
         $PYTHON_BIN - <<'PYEOF'
 import json, os, re
 
 py = os.environ["PYTHON_BIN"]
-scripts_dir = os.environ["SCRIPTS_DIR"]
+hook_scripts = os.environ["HOOK_SCRIPTS"]
 src = os.environ["SRC"]
 dst = os.environ["DST"]
 
@@ -165,14 +177,15 @@ for event in data.get("hooks", {}).values():
             m = script_re.search(hook.get("command", ""))
             if not m:
                 continue
-            script_path = os.path.join(scripts_dir, m.group(1))
+            # Forward slashes + literal token: portable across WSL and Windows.
+            script_path = f"{hook_scripts}/{m.group(1)}"
             hook["command"] = f'{py} "{script_path}"'
 
 with open(dst, "w", encoding="utf-8") as fh:
     json.dump(data, fh, indent=2)
     fh.write("\n")
 PYEOF
-    log_info "Settings generated with absolute hook paths -> $dst"
+    log_info "Settings generated with portable hook paths ($hook_scripts) -> $dst"
 }
 
 check_repo() {
@@ -295,7 +308,11 @@ cmd_install() {
         log_warn "keywords.json already exists, skipping"
     fi
 
-    install_settings "$install_dir"
+    if [[ "$target" == "local" ]]; then
+        install_settings "$install_dir" '${CLAUDE_PROJECT_DIR}/.claude/scripts'
+    else
+        install_settings "$install_dir" '$HOME/.claude/scripts'
+    fi
 
     # Install MCP config if global
     if [[ "$target" == "global" && ! -f "$HOME/.mcp.json" ]]; then
@@ -341,7 +358,7 @@ cmd_sync() {
     # Regenerate settings.json so hook paths stay correct after updates
     log_step "Regenerating settings.json hook paths..."
     detect_python
-    install_settings "$CLAUDE_HOME"
+    install_settings "$CLAUDE_HOME" '$HOME/.claude/scripts'
 
     log_header "Sync Complete!"
 }
