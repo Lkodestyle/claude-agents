@@ -94,9 +94,10 @@ Caracteristicas:
 
 Coordinacion entre multiples instancias de Claude Code:
 
-- Detecta automaticamente tareas completadas y bloqueadores
-- Comparte estado entre instancias (A, B, C, etc.)
+- Comparte estado entre instancias (A, B, C, etc.) via `.claude/pool/instance_state.jsonl`
 - Evita trabajo duplicado en equipos
+- El hook `SessionStart` inyecta la actividad reciente de otras instancias al contexto
+- El hook `Stop` extrae los bloques `pool` explicitos de la ultima respuesta
 
 Para usar multiples instancias:
 ```bash
@@ -108,6 +109,24 @@ claude
 export CLAUDE_INSTANCE=B
 claude
 ```
+
+**INSTRUCCION (protocolo pool):** Si la variable `CLAUDE_INSTANCE` esta definida, al terminar
+una tarea significativa (feature completada, blocker encontrado, decision que afecta a otros)
+DEBES cerrar tu respuesta con un bloque `pool` para que las demas instancias lo vean:
+
+````markdown
+```pool
+INSTANCE: A
+ACTION: completed | blocked | in_progress | signaling
+TOPIC: titulo corto de la tarea
+SUMMARY: que se hizo o que bloquea, en una linea
+AFFECTS: archivos o areas afectadas
+BLOCKS: que trabajo puede continuar o queda bloqueado (opcional)
+```
+````
+
+Solo los bloques explicitos se guardan (el hook no adivina con regex). No emitas bloques
+para respuestas conversacionales o cambios triviales.
 
 ## Como Usar
 

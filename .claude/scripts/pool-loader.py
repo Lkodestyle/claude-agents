@@ -32,7 +32,11 @@ if sys.platform == "win32":
 
 
 def get_project_root() -> Path:
-    """Find project root by looking for .claude directory."""
+    """Find project root: CLAUDE_PROJECT_DIR (set by the hook runner) wins."""
+    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_root and (Path(env_root) / ".claude").exists():
+        return Path(env_root)
+
     cwd = Path.cwd()
 
     if (cwd / ".claude").exists():
@@ -166,8 +170,24 @@ def format_pool_summary(entries: List[Dict], current_instance: str) -> str:
     return "".join(output_parts)
 
 
+def read_hook_payload() -> Dict:
+    """Read the JSON payload Claude Code pipes to SessionStart hooks."""
+    if sys.stdin.isatty():
+        return {}
+    try:
+        raw = sys.stdin.read()
+        return json.loads(raw) if raw.strip() else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def main():
-    """Main pool loader logic."""
+    """Main pool loader logic.
+
+    Anything printed to stdout is added to Claude's context for the new
+    session — that is the supported SessionStart output channel.
+    """
+    payload = read_hook_payload()
     claude_dir = get_claude_dir()
     pool_dir = claude_dir / "pool"
 
