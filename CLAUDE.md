@@ -561,6 +561,11 @@ Para mas info sobre hooks, ejecuta `/hooks` en Claude Code.
 | `OBSIDIAN_API_KEY` | API key del plugin Local REST API de Obsidian | Para MCP Obsidian |
 | `MCP_PROXY_TOKEN` | Token para mcp-proxy | Para mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Limite de tokens para MCP (default: 25000) | No |
+| `DEEPGRAM_API_KEY` | STT de jarvis-voice | Para jarvis-voice |
+| `VOYAGE_API_KEY` | Embeddings de jarvis-memory | Recomendada para jarvis-memory |
+| `JARVIS_VOICE_MEMORY` | Memoria semantica en jarvis-voice (`on`/`off`, default off) | No |
+| `JARVIS_MEMORY_BIN` | Path explicito al binario jarvis-memory | No |
+| `JARVIS_DATA_DIR` | Ubicacion del store de memoria (default `~/.jarvis/memory`) | No |
 
 **Tip:** Si memory o MCP servers causan problemas de tokens:
 ```bash
