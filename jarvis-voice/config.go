@@ -32,6 +32,15 @@ type Config struct {
 	// Working directory for transient audio files (mic recordings + TTS output).
 	WorkDir string
 
+	// Milestone B: semantic memory via the jarvis-memory MCP server.
+	// Opt-in — off unless JARVIS_VOICE_MEMORY is "on"/"true"/"1". When off,
+	// the loop runs exactly like Milestone A with zero extra processes.
+	MemoryEnabled bool
+
+	// Explicit path to the jarvis-memory binary (JARVIS_MEMORY_BIN).
+	// Empty = auto-discover next to our executable, then PATH.
+	MemoryBin string
+
 	// System prompt sent to Claude. Designed for spoken responses: short,
 	// composed, no filler. The persona stays close to /jarvis mode in text.
 	SystemPrompt string
@@ -51,13 +60,15 @@ Hablas en nombre del proyecto Jarvis del usuario. Si te pide algo del codigo o s
 
 func loadConfig() (*Config, error) {
 	cfg := &Config{
-		DeepgramKey:  os.Getenv("DEEPGRAM_API_KEY"),
-		AnthropicKey: os.Getenv("ANTHROPIC_API_KEY"),
-		Model:        getenv("JARVIS_VOICE_MODEL", "claude-sonnet-4-5-20250929"),
-		Voice:        getenv("JARVIS_VOICE", "es-AR-TomasNeural"),
-		RecordSec:    getenvInt("JARVIS_VOICE_RECORD_SEC", 8),
-		WorkDir:      getenv("JARVIS_VOICE_WORKDIR", defaultWorkDir()),
-		SystemPrompt: defaultSystemPrompt,
+		DeepgramKey:   os.Getenv("DEEPGRAM_API_KEY"),
+		AnthropicKey:  os.Getenv("ANTHROPIC_API_KEY"),
+		Model:         getenv("JARVIS_VOICE_MODEL", "claude-sonnet-4-5-20250929"),
+		Voice:         getenv("JARVIS_VOICE", "es-AR-TomasNeural"),
+		RecordSec:     getenvInt("JARVIS_VOICE_RECORD_SEC", 8),
+		WorkDir:       getenv("JARVIS_VOICE_WORKDIR", defaultWorkDir()),
+		SystemPrompt:  defaultSystemPrompt,
+		MemoryEnabled: getenvBool("JARVIS_VOICE_MEMORY"),
+		MemoryBin:     os.Getenv("JARVIS_MEMORY_BIN"),
 	}
 
 	var missing []string
@@ -86,6 +97,14 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getenvBool(key string) bool {
+	switch os.Getenv(key) {
+	case "on", "true", "1":
+		return true
+	}
+	return false
 }
 
 func getenvInt(key string, fallback int) int {

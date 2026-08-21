@@ -119,7 +119,7 @@ func edgeTTS(ctx context.Context, voice, text, outPath string) error {
 // rounded down to the nearest 5-minute boundary so the same value holds for a
 // few minutes — this lets the server cache the validation cheaply.
 func generateSecMsGec() string {
-	const winEpoch = int64(11644473600)        // seconds between 1601 and 1970
+	const winEpoch = int64(11644473600)         // seconds between 1601 and 1970
 	const interval = int64(5 * 60 * 10_000_000) // 5 minutes in 100-ns ticks
 	ticks := (time.Now().Unix() + winEpoch) * 10_000_000
 	ticks -= ticks % interval

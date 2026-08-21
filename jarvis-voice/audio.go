@@ -173,8 +173,8 @@ func playMP3(ctx context.Context, inPath string) error {
 	}
 	cmd := exec.CommandContext(ctx, "ffplay",
 		"-loglevel", "error",
-		"-nodisp",       // no GUI window
-		"-autoexit",     // quit when file ends
+		"-nodisp",   // no GUI window
+		"-autoexit", // quit when file ends
 		"-hide_banner",
 		inPath,
 	)
