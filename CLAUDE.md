@@ -481,12 +481,11 @@ depender del directorio actual:
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/context-router.py\"",
-            "timeout": 5000
+            "timeout": 10
           }
         ]
       }
@@ -494,6 +493,10 @@ depender del directorio actual:
   }
 }
 ```
+
+**Nota:** `timeout` va en **segundos** (no milisegundos). El campo `matcher` solo aplica a
+hooks de tools (`PreToolUse`/`PostToolUse`); en eventos como `UserPromptSubmit`, `Stop` o
+`SessionStart` se omite.
 
 Para una instalacion **global**, el instalador (`claude-agents-cli.sh install`) genera el
 `~/.claude/settings.json` con **rutas absolutas** al directorio de scripts y el binario de
