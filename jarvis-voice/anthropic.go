@@ -47,11 +47,16 @@ type messagesResp struct {
 	} `json:"error,omitempty"`
 }
 
-func anthropicChat(ctx context.Context, cfg *Config, history []Message) (string, error) {
+// anthropicChat sends one turn. system overrides cfg.SystemPrompt so callers
+// can append per-turn context (e.g. recalled memories) without mutating cfg.
+func anthropicChat(ctx context.Context, cfg *Config, system string, history []Message) (string, error) {
+	if system == "" {
+		system = cfg.SystemPrompt
+	}
 	body, err := json.Marshal(messagesReq{
 		Model:     cfg.Model,
 		MaxTokens: 400, // keep replies tight; voice playback time scales with this
-		System:    cfg.SystemPrompt,
+		System:    system,
 		Messages:  history,
 	})
 	if err != nil {

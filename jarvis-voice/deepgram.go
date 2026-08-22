@@ -38,10 +38,10 @@ func deepgramTranscribe(ctx context.Context, apiKey, wavPath string) (string, er
 	defer f.Close()
 
 	q := url.Values{}
-	q.Set("model", "nova-3")        // current best general model
-	q.Set("smart_format", "true")   // capitalization, punctuation, numbers
+	q.Set("model", "nova-3")      // current best general model
+	q.Set("smart_format", "true") // capitalization, punctuation, numbers
 	q.Set("punctuate", "true")
-	q.Set("language", "multi")      // auto-detect; works for ES + EN code-switching
+	q.Set("language", "multi") // auto-detect; works for ES + EN code-switching
 	endpoint := deepgramURL + "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, f)

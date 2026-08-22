@@ -2,41 +2,38 @@
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/context-router.py\"",
-            "timeout": 5000
+            "timeout": 10
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/jarvis-mode-prompt.py\"",
-            "timeout": 2000
+            "timeout": 5
           }
         ]
       }
     ],
     "SessionStart": [
       {
-        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/pool-loader.py\"",
-            "timeout": 3000
+            "timeout": 5
           }
         ]
       }
     ],
     "Stop": [
       {
-        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/pool-extractor.py\"",
-            "timeout": 3000
+            "timeout": 5
           }
         ]
       }

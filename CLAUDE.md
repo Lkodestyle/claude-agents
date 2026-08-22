@@ -94,9 +94,10 @@ Caracteristicas:
 
 Coordinacion entre multiples instancias de Claude Code:
 
-- Detecta automaticamente tareas completadas y bloqueadores
-- Comparte estado entre instancias (A, B, C, etc.)
+- Comparte estado entre instancias (A, B, C, etc.) via `.claude/pool/instance_state.jsonl`
 - Evita trabajo duplicado en equipos
+- El hook `SessionStart` inyecta la actividad reciente de otras instancias al contexto
+- El hook `Stop` extrae los bloques `pool` explicitos de la ultima respuesta
 
 Para usar multiples instancias:
 ```bash
@@ -108,6 +109,24 @@ claude
 export CLAUDE_INSTANCE=B
 claude
 ```
+
+**INSTRUCCION (protocolo pool):** Si la variable `CLAUDE_INSTANCE` esta definida, al terminar
+una tarea significativa (feature completada, blocker encontrado, decision que afecta a otros)
+DEBES cerrar tu respuesta con un bloque `pool` para que las demas instancias lo vean:
+
+````markdown
+```pool
+INSTANCE: A
+ACTION: completed | blocked | in_progress | signaling
+TOPIC: titulo corto de la tarea
+SUMMARY: que se hizo o que bloquea, en una linea
+AFFECTS: archivos o areas afectadas
+BLOCKS: que trabajo puede continuar o queda bloqueado (opcional)
+```
+````
+
+Solo los bloques explicitos se guardan (el hook no adivina con regex). No emitas bloques
+para respuestas conversacionales o cambios triviales.
 
 ## Como Usar
 
@@ -462,12 +481,11 @@ depender del directorio actual:
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/context-router.py\"",
-            "timeout": 5000
+            "timeout": 10
           }
         ]
       }
@@ -475,6 +493,10 @@ depender del directorio actual:
   }
 }
 ```
+
+**Nota:** `timeout` va en **segundos** (no milisegundos). El campo `matcher` solo aplica a
+hooks de tools (`PreToolUse`/`PostToolUse`); en eventos como `UserPromptSubmit`, `Stop` o
+`SessionStart` se omite.
 
 Para una instalacion **global**, el instalador (`claude-agents-cli.sh install`) genera el
 `~/.claude/settings.json` con **rutas absolutas** al directorio de scripts y el binario de
@@ -542,6 +564,11 @@ Para mas info sobre hooks, ejecuta `/hooks` en Claude Code.
 | `OBSIDIAN_API_KEY` | API key del plugin Local REST API de Obsidian | Para MCP Obsidian |
 | `MCP_PROXY_TOKEN` | Token para mcp-proxy | Para mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Limite de tokens para MCP (default: 25000) | No |
+| `DEEPGRAM_API_KEY` | STT de jarvis-voice | Para jarvis-voice |
+| `VOYAGE_API_KEY` | Embeddings de jarvis-memory | Recomendada para jarvis-memory |
+| `JARVIS_VOICE_MEMORY` | Memoria semantica en jarvis-voice (`on`/`off`, default off) | No |
+| `JARVIS_MEMORY_BIN` | Path explicito al binario jarvis-memory | No |
+| `JARVIS_DATA_DIR` | Ubicacion del store de memoria (default `~/.jarvis/memory`) | No |
 
 **Tip:** Si memory o MCP servers causan problemas de tokens:
 ```bash

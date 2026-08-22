@@ -3,10 +3,23 @@
 """
 Pool Extractor - Extract completion/blocker signals
 
-Extracts pool blocks from Claude responses and saves them
-for other instances to see.
+Runs on the Claude Code `Stop` hook. Per the hooks contract, stdin carries a
+JSON payload (session_id, transcript_path, stop_hook_active, ...) — NOT the
+conversation text. We read the transcript from `transcript_path`, take the
+last assistant message, and persist any explicit ```pool blocks so other
+instances can see them.
 
-Based on claude-cognitive Pool Coordinator patterns.
+Only explicit blocks are extracted: deterministic hooks beat regex guessing.
+The pool block protocol Claude emits (documented in CLAUDE.md):
+
+    ```pool
+    INSTANCE: A
+    ACTION: completed | blocked | in_progress | signaling
+    TOPIC: Setup authentication
+    SUMMARY: Implemented JWT with refresh
+    AFFECTS: auth.py, session.py
+    BLOCKS: Session management can proceed
+    ```
 
 Usage: Called by Claude Code hooks (Stop)
 """
@@ -34,9 +47,12 @@ if sys.platform == "win32":
 
 
 def get_project_root() -> Path:
-    """Find project root by looking for .claude directory."""
-    cwd = Path.cwd()
+    """Find project root: CLAUDE_PROJECT_DIR (set by the hook runner) wins."""
+    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_root and (Path(env_root) / ".claude").exists():
+        return Path(env_root)
 
+    cwd = Path.cwd()
     if (cwd / ".claude").exists():
         return cwd
 
@@ -70,24 +86,66 @@ def get_instance_id() -> str:
     return os.environ.get("CLAUDE_INSTANCE", "default")
 
 
-def get_session_id() -> str:
-    """Get or generate session ID."""
-    return os.environ.get("CLAUDE_SESSION_ID", str(uuid.uuid4())[:8])
+def read_hook_payload() -> Dict:
+    """Read the JSON payload Claude Code pipes to Stop hooks."""
+    if sys.stdin.isatty():
+        return {}
+    try:
+        raw = sys.stdin.read()
+        return json.loads(raw) if raw.strip() else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def message_text(message: Dict) -> str:
+    """Flatten a transcript message's content into plain text.
+
+    Content is either a string or a list of typed blocks; only text blocks
+    can carry a pool block, so everything else is skipped.
+    """
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    parts = []
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+    return "\n".join(parts)
+
+
+def last_assistant_text(transcript_path: str) -> str:
+    """Return the text of the last assistant message in the transcript JSONL."""
+    if not transcript_path:
+        return ""
+    path = Path(transcript_path)
+    if not path.exists():
+        return ""
+
+    last = ""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                message = entry.get("message") or {}
+                if entry.get("type") == "assistant" or message.get("role") == "assistant":
+                    text = message_text(message)
+                    if text:
+                        last = text
+    except OSError:
+        return ""
+
+    return last
 
 
 def extract_pool_blocks(text: str) -> List[Dict]:
-    """Extract explicit pool blocks from text.
-
-    Format:
-    ```pool
-    INSTANCE: A
-    ACTION: completed
-    TOPIC: Setup authentication
-    SUMMARY: Implemented JWT with refresh
-    AFFECTS: auth.py, session.py
-    BLOCKS: Session management can proceed
-    ```
-    """
+    """Extract explicit pool blocks from text."""
     pattern = r'```pool\s*(.*?)```'
     matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
 
@@ -131,52 +189,7 @@ def parse_pool_block(block_text: str) -> Optional[Dict]:
     return None
 
 
-def detect_implicit_signals(text: str) -> List[Dict]:
-    """Detect implicit completion/blocker signals in text.
-
-    Looks for patterns like:
-    - "Successfully completed X"
-    - "Finished implementing Y"
-    - "Blocked by Z"
-    - "Cannot proceed until W"
-    """
-    signals = []
-
-    # Completion patterns
-    completion_patterns = [
-        r'(?:successfully|finished|completed|done)\s+(?:implementing|creating|setting up|configuring|deploying)\s+(.{10,80})',
-        r'(?:the|this)\s+(.{10,50})\s+(?:is now|has been)\s+(?:complete|ready|deployed|configured)',
-        r'i\'ve\s+(?:finished|completed|done)\s+(.{10,80})',
-    ]
-
-    for pattern in completion_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            signals.append({
-                'action': 'completed',
-                'topic': match.strip()[:80],
-                'summary': f'Detected completion: {match.strip()[:100]}'
-            })
-
-    # Blocker patterns
-    blocker_patterns = [
-        r'(?:blocked|waiting|cannot proceed)\s+(?:by|on|until)\s+(.{10,80})',
-        r'(?:needs|requires|depends on)\s+(.{10,80})\s+(?:first|before)',
-    ]
-
-    for pattern in blocker_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        for match in matches:
-            signals.append({
-                'action': 'blocked',
-                'topic': match.strip()[:80],
-                'summary': f'Detected blocker: {match.strip()[:100]}'
-            })
-
-    return signals[:3]  # Limit to 3 implicit signals
-
-
-def save_pool_entry(pool_dir: Path, entry: Dict) -> None:
+def save_pool_entry(pool_dir: Path, entry: Dict, session_id: str) -> None:
     """Save a pool entry to the pool file."""
     pool_file = pool_dir / "instance_state.jsonl"
 
@@ -187,7 +200,7 @@ def save_pool_entry(pool_dir: Path, entry: Dict) -> None:
     entry["id"] = str(uuid.uuid4())
     entry["timestamp"] = datetime.now().isoformat()
     entry["source_instance"] = entry.get("source_instance", get_instance_id())
-    entry["session_id"] = get_session_id()
+    entry["session_id"] = session_id
 
     try:
         with open(pool_file, "a", encoding="utf-8") as f:
@@ -215,40 +228,30 @@ def cleanup_old_entries(pool_dir: Path, max_entries: int = 100) -> None:
         pass
 
 
-def read_transcript_from_stdin() -> str:
-    """Read conversation transcript from stdin."""
-    if not sys.stdin.isatty():
-        try:
-            return sys.stdin.read()
-        except Exception:
-            return ""
-    return ""
-
-
 def main():
     """Main pool extractor logic."""
-    claude_dir = get_claude_dir()
-    pool_dir = claude_dir / "pool"
+    payload = read_hook_payload()
 
-    # Read transcript
-    transcript = read_transcript_from_stdin()
-
-    if not transcript:
+    # Loop guard: if this Stop event was itself triggered by a stop hook,
+    # bail out (per Anthropic hooks docs).
+    if payload.get("stop_hook_active"):
         return
 
-    # Extract explicit pool blocks
-    explicit_blocks = extract_pool_blocks(transcript)
+    text = last_assistant_text(payload.get("transcript_path", ""))
+    if not text:
+        return
 
-    # If no explicit blocks, try implicit detection
-    if not explicit_blocks:
-        implicit_signals = detect_implicit_signals(transcript)
-        for signal in implicit_signals:
-            save_pool_entry(pool_dir, signal)
-    else:
-        for block in explicit_blocks:
-            save_pool_entry(pool_dir, block)
+    blocks = extract_pool_blocks(text)
+    if not blocks:
+        return
 
-    # Cleanup old entries
+    claude_dir = get_claude_dir()
+    pool_dir = claude_dir / "pool"
+    session_id = payload.get("session_id", "") or str(uuid.uuid4())[:8]
+
+    for block in blocks:
+        save_pool_entry(pool_dir, block, session_id)
+
     cleanup_old_entries(pool_dir)
 
 

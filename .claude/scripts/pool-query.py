@@ -39,6 +39,10 @@ def get_claude_dir() -> Path:
     if env_root:
         return Path(env_root)
 
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    if project_dir and (Path(project_dir) / ".claude").exists():
+        return Path(project_dir) / ".claude"
+
     cwd = Path.cwd()
     if (cwd / ".claude").exists():
         return cwd / ".claude"
