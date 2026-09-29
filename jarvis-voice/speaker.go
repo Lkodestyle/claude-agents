@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -27,7 +28,9 @@ func NewSpeaker(cfg *Config, mute func(bool)) *Speaker {
 	return &Speaker{cfg: cfg, mute: mute}
 }
 
-func (s *Speaker) Say(ctx context.Context, text string) error {
+// Say speaks text. With cue, a short beep follows while the mic is still
+// muted, marking the exact moment the user can answer.
+func (s *Speaker) Say(ctx context.Context, text string, cue bool) error {
 	text = speakable(text)
 	if text == "" {
 		return nil
@@ -48,7 +51,16 @@ func (s *Speaker) Say(ctx context.Context, text string) error {
 	if err := playMP3(ctx, path); err != nil {
 		return fmt.Errorf("play: %w", err)
 	}
+	if cue && s.cfg.Earcon {
+		playCue(ctx)
+	}
 	return nil
+}
+
+// playCue plays a short soft tone (ffplay's lavfi sine source, no file).
+func playCue(ctx context.Context) {
+	exec.CommandContext(ctx, "ffplay", "-loglevel", "error", "-nodisp", "-autoexit",
+		"-f", "lavfi", "-i", "sine=frequency=880:duration=0.12", "-af", "volume=0.35").Run()
 }
 
 var (

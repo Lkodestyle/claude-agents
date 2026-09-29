@@ -28,8 +28,14 @@ const (
 	recallK             = 4
 	recallMinSimilarity = 0.35
 
-	// How long a spoken permission question waits for a yes/no.
-	permissionTimeout = 45 * time.Second
+	// A spoken permission question is repeated once after permissionNudge
+	// without an answer, then denied after permissionTimeout more.
+	permissionNudge   = 20 * time.Second
+	permissionTimeout = 25 * time.Second
+
+	// How long to wait for the rest of a sentence that sounds unfinished
+	// ("...y después, o sea") before sending it.
+	continuationWait = 1500 * time.Millisecond
 
 	// Upper bound for the exit wrap-up (session summary to Obsidian/memory).
 	wrapUpTimeout = 2 * time.Minute
@@ -80,6 +86,8 @@ func main() {
 		fmt.Printf("  mic     : %s\n", dev)
 	}
 
+	safeRoots = append([]string{cfg.Workspace}, cfg.AddDirs...)
+
 	brain, err := buildBrain(cfg)
 	if err != nil {
 		log.Fatalf("brain: %v", err)
@@ -100,7 +108,7 @@ func main() {
 	}
 
 	utterances := startInput(ctx, cfg, listener, stop)
-	s := &session{ctx: ctx, brain: brain, speaker: speaker, ptt: cfg.Mode == "ptt"}
+	s := &session{ctx: ctx, brain: brain, speaker: speaker, ptt: cfg.Mode == "ptt", confirm: cfg.ConfirmPolicy}
 	s.run(utterances)
 	if cfg.Brain == "claude" && cfg.WrapUp {
 		s.wrapUp()
@@ -222,19 +230,28 @@ type session struct {
 	speaker *Speaker // nil in text mode
 	ptt     bool
 
+	confirm string // confirmation policy, see policy.go
+
 	busy     bool
 	turns    int // user turns sent this run
 	queued   []string
 	perm     *BrainEvent // pending permission question
 	permTime *time.Timer
+	nudged   bool // the pending question was already repeated
+
+	held     string // an utterance that sounded unfinished
+	heldTime *time.Timer
 }
 
 func (s *session) run(utterances <-chan string) {
 	s.promptIdle()
 	for {
-		var permC <-chan time.Time
+		var permC, heldC <-chan time.Time
 		if s.permTime != nil {
 			permC = s.permTime.C
+		}
+		if s.heldTime != nil {
+			heldC = s.heldTime.C
 		}
 
 		select {
@@ -244,28 +261,73 @@ func (s *session) run(utterances <-chan string) {
 
 		case u := <-utterances:
 			fmt.Printf("  vos   : %s\n", u)
+			s.hear(u)
+
+		case <-heldC:
+			u := s.held
+			s.held, s.heldTime = "", nil
 			s.onUtterance(u)
 
 		case ev := <-s.brain.Events():
 			s.onEvent(ev)
 
 		case <-permC:
+			if !s.nudged {
+				s.nudged = true
+				s.permTime = time.NewTimer(permissionTimeout)
+				s.ask("¿Lo hago, sí o no?")
+				continue
+			}
 			s.answerPermission(false, "No confirmation was received in time.")
 			s.say("No escuché respuesta, así que no lo hago.")
 		}
 	}
 }
 
+// hear merges an utterance with a previously held fragment and holds it
+// again if it still sounds unfinished, so a mid-sentence pause doesn't send
+// half a request.
+func (s *session) hear(u string) {
+	if s.held != "" {
+		u = s.held + " " + u
+		s.held = ""
+		if s.heldTime != nil {
+			s.heldTime.Stop()
+			s.heldTime = nil
+		}
+	}
+	if soundsUnfinished(u) && !(s.perm != nil && classifyAnswer(u) != answerUnknown) {
+		s.held = u
+		s.heldTime = time.NewTimer(continuationWait)
+		return
+	}
+	s.onUtterance(u)
+}
+
 func (s *session) onUtterance(u string) {
 	switch {
 	case s.perm != nil:
-		switch classifyYesNo(u) {
+		switch classifyAnswer(u) {
 		case answerYes:
 			s.answerPermission(true, "")
+			// "Sí, dale, pero ponele X": approve, and pass the extra
+			// instruction along as the next turn.
+			if len(tokens(u)) > 4 {
+				s.queued = append(s.queued, "(Sobre lo que acabo de aprobar) "+u)
+			}
 		case answerNo:
 			s.answerPermission(false, "The user said no: "+u)
+		case answerOther:
+			s.answerPermission(false, fmt.Sprintf(
+				"The user did not approve it as-is. They said: %q. Adjust the action to what they asked; don't ask again for the same thing.", u))
 		default:
-			s.say("No te entendí. ¿Sí o no?")
+			if s.nudged {
+				s.answerPermission(false, "The user's answer was unclear: "+u)
+				s.say("No te entendí, así que no lo hago.")
+				return
+			}
+			s.nudged = true
+			s.ask("No te entendí. ¿Sí o no?")
 		}
 
 	case s.busy:
@@ -295,10 +357,18 @@ func (s *session) onEvent(ev BrainEvent) {
 		fmt.Printf("  ⚙  %s\n", ev.Text)
 
 	case EventPermission:
+		if !needsConfirmation(s.confirm, ev.ToolName, ev.Input) {
+			fmt.Printf("  ✔  auto: %s\n", ev.Prompt)
+			if err := s.brain.Respond(ev.RequestID, true, ""); err != nil {
+				log.Printf("permission response: %v", err)
+			}
+			return
+		}
 		s.perm = &ev
-		s.permTime = time.NewTimer(permissionTimeout)
+		s.nudged = false
+		s.permTime = time.NewTimer(permissionNudge)
 		fmt.Printf("  ❓ permission: %s\n", ev.Prompt)
-		s.say(fmt.Sprintf("Necesito tu ok para %s. ¿Lo hago?", ev.Prompt))
+		s.ask(fmt.Sprintf("¿Confirmás %s?", ev.Prompt))
 
 	case EventError:
 		fmt.Printf("  ✖  %s\n", ev.Text)
@@ -362,7 +432,19 @@ func (s *session) sayCtx(ctx context.Context, text string) {
 	if s.speaker == nil {
 		return
 	}
-	if err := s.speaker.Say(ctx, text); err != nil && ctx.Err() == nil {
+	if err := s.speaker.Say(ctx, text, false); err != nil && ctx.Err() == nil {
+		log.Printf("speak: %v", err)
+	}
+}
+
+// ask speaks a question that expects an answer and ends with a short cue
+// the moment the mic reopens, so the user knows when to reply.
+func (s *session) ask(text string) {
+	if s.speaker == nil {
+		fmt.Printf("  jarvis: %s\n", text)
+		return
+	}
+	if err := s.speaker.Say(s.ctx, text, true); err != nil && s.ctx.Err() == nil {
 		log.Printf("speak: %v", err)
 	}
 }
@@ -474,29 +556,44 @@ const (
 	answerUnknown answer = iota
 	answerYes
 	answerNo
+	answerOther // a longer reply that is neither: a correction or new instruction
 )
 
 var (
-	yesWords = set("si", "dale", "ok", "okay", "okey", "hacelo", "adelante", "confirmo",
-		"confirmado", "obvio", "claro", "bueno", "listo", "afirmativo", "yes", "sure", "va", "sale", "mandale")
+	yesWords = set("si", "sisi", "dale", "ok", "okay", "okey", "hacelo", "adelante", "confirmo",
+		"confirmado", "obvio", "claro", "bueno", "listo", "afirmativo", "yes", "sure", "va", "sale",
+		"mandale", "metele", "correcto", "exacto", "perfecto", "absolutamente", "absoluto", "genial")
 	noWords = set("no", "nop", "nope", "cancela", "cancelalo", "negativo", "deja", "dejalo",
-		"frena", "para", "stop", "nah", "tampoco")
+		"frena", "stop", "nah", "tampoco", "espera", "pera", "nono")
 	stopWords = set("para", "stop", "cancela", "cancelalo", "frena", "basta", "detente", "callate")
+
+	// Words a sentence doesn't normally end on: the speaker paused mid-thought.
+	danglingWords = set("que", "y", "o", "pero", "porque", "entonces", "como", "con", "de", "del",
+		"en", "a", "al", "el", "la", "los", "las", "un", "una", "me", "te", "se", "le", "mi", "tu",
+		"sea", "osea", "por", "cuando", "donde", "tipo", "digamos", "eh", "em", "este", "and", "the")
 )
 
-// classifyYesNo is deliberately conservative: any "no" word wins, so a
-// garbled or hedged answer never approves an action.
-func classifyYesNo(u string) answer {
+// classifyAnswer reads a reply to a permission question. People answer
+// first ("Sí, dale, pero...", "No, mejor mañana"), so the opening words
+// decide; anything longer without a clear opener is a correction.
+func classifyAnswer(u string) answer {
 	words := tokens(u)
-	for _, w := range words {
+	head := words
+	if len(head) > 3 {
+		head = head[:3]
+	}
+	for _, w := range head {
 		if noWords[w] {
 			return answerNo
 		}
 	}
-	for _, w := range words {
+	for _, w := range head {
 		if yesWords[w] {
 			return answerYes
 		}
+	}
+	if len(words) > 4 {
+		return answerOther
 	}
 	return answerUnknown
 }
@@ -506,6 +603,16 @@ func classifyYesNo(u string) answer {
 func isStopCommand(u string) bool {
 	words := tokens(u)
 	return len(words) > 0 && len(words) <= 3 && stopWords[words[0]]
+}
+
+// soundsUnfinished spots an utterance cut by a thinking pause.
+func soundsUnfinished(u string) bool {
+	t := strings.TrimSpace(u)
+	if strings.HasSuffix(t, ",") || strings.HasSuffix(t, "...") || strings.HasSuffix(t, "…") {
+		return true
+	}
+	words := tokens(t)
+	return len(words) > 0 && danglingWords[words[len(words)-1]]
 }
 
 func tokens(s string) []string {

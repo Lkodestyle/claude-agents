@@ -79,6 +79,18 @@ type Config struct {
 	// comma-separated, replaces the default read-only list).
 	AllowedTools []string
 
+	// Which permission requests are asked out loud (JARVIS_VOICE_CONFIRM):
+	// "sensitive" (default), "all" or "none". See policy.go.
+	ConfirmPolicy string
+
+	// Silence that ends a turn, in ms (JARVIS_VOICE_PAUSE_MS). Longer is
+	// more forgiving with thinking pauses, shorter answers faster.
+	PauseMs int
+
+	// Beep when the mic reopens after a question (JARVIS_VOICE_EARCON,
+	// on by default; "off" disables).
+	Earcon bool
+
 	// Continue the most recent Jarvis session instead of starting fresh
 	// (JARVIS_VOICE_CONTINUE=on).
 	Continue bool
@@ -102,6 +114,9 @@ const voiceRules = `You are running as a VOICE assistant. Everything you write a
 - Reply in the user's language (default: Spanish, casual rioplatense voseo). Friendly and respectful: no insults or crude slang (never "boludo", "che boludo", etc.).
 - 1 to 3 short sentences per reply. No markdown, no bullet lists, no code blocks, no URLs, no file paths read out in full.
 - Before a tool call that may take a while, say in a few words what you are about to do ("Dale, reviso tu calendario.").
+- Do NOT ask for permission or confirmation in text before using tools: the system approves routine actions silently and asks the user out loud for sensitive ones (sending, deleting, pushing, infra changes). Just act. Still ask a clarifying question when the request itself is unclear.
+- If a tool call is denied with the user's words, do what those words say instead; don't ask the same thing again.
+- Write the Bash tool "description" in the user's language, as a short verb phrase ("borrar la carpeta build"): it is read aloud when confirmation is needed.
 - After working, report only the outcome, not the steps.
 - If you need information, ask ONE short, specific question.
 - Never use the AskUserQuestion tool; ask in plain text instead.
@@ -124,7 +139,7 @@ Hablas en nombre del proyecto Jarvis del usuario. Si te pide algo del codigo o s
 // spoken confirmation. Anything else (writes, Bash, sending mail, creating
 // events...) is asked out loud first.
 var defaultAllowedTools = []string{
-	"Read", "Glob", "Grep", "WebSearch", "WebFetch", "Task", "TodoWrite",
+	"Read", "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent", "TodoWrite",
 	"mcp__jarvis-memory__recall",
 	"mcp__jarvis-memory__remember",
 	"mcp__claude_ai_Google_Calendar__list_events",
@@ -165,6 +180,9 @@ func loadConfig() (*Config, error) {
 		AllowedTools:   splitList(os.Getenv("JARVIS_VOICE_ALLOWED_TOOLS")),
 		VADThreshold:   getenvInt("JARVIS_VOICE_VAD_RMS", 0),
 		Continue:       getenvBool("JARVIS_VOICE_CONTINUE"),
+		ConfirmPolicy:  strings.ToLower(getenv("JARVIS_VOICE_CONFIRM", "sensitive")),
+		PauseMs:        getenvInt("JARVIS_VOICE_PAUSE_MS", 1500),
+		Earcon:         os.Getenv("JARVIS_VOICE_EARCON") != "off",
 		WrapUp:         os.Getenv("JARVIS_VOICE_WRAPUP") != "off",
 	}
 
@@ -181,6 +199,14 @@ func loadConfig() (*Config, error) {
 	case "claude", "api":
 	default:
 		return nil, errors.New("JARVIS_VOICE_BRAIN must be 'claude' or 'api'")
+	}
+	switch cfg.ConfirmPolicy {
+	case "sensitive", "all", "none":
+	default:
+		return nil, errors.New("JARVIS_VOICE_CONFIRM must be 'sensitive', 'all' or 'none'")
+	}
+	if cfg.PauseMs < 500 {
+		cfg.PauseMs = 500
 	}
 	switch cfg.Mode {
 	case "live", "ptt", "text":
