@@ -66,3 +66,28 @@ func TestSpeakable(t *testing.T) {
 		t.Errorf("speakable = %q, want %q", got, want)
 	}
 }
+
+func TestWrapUpAllowed(t *testing.T) {
+	path := func(p string) json.RawMessage {
+		raw, _ := json.Marshal(map[string]string{"file_path": p})
+		return raw
+	}
+	cases := []struct {
+		tool  string
+		input json.RawMessage
+		want  bool
+	}{
+		{"mcp__obsidian-vault__write_note", nil, true},
+		{"mcp__obsidian-vault__delete_note", nil, false},
+		{"Write", path("/home/u/.claude/projects/-home-u--jarvis-workspace/memory/x.md"), true},
+		{"Write", path("/home/u/.claude/projects/p/memory/../../../../.bashrc"), false},
+		{"Write", path("/home/u/.bashrc"), false},
+		{"Bash", nil, false},
+		{"mcp__claude_ai_Gmail__send_message", nil, false},
+	}
+	for _, c := range cases {
+		if got := wrapUpAllowed(c.tool, c.input); got != c.want {
+			t.Errorf("wrapUpAllowed(%s, %s) = %v, want %v", c.tool, c.input, got, c.want)
+		}
+	}
+}

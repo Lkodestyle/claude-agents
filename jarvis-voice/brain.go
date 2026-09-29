@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -36,8 +37,10 @@ const (
 type BrainEvent struct {
 	Kind      BrainEventKind
 	Text      string
-	RequestID string // EventPermission only
-	Prompt    string // EventPermission only: human description of the action
+	RequestID string          // EventPermission only
+	Prompt    string          // EventPermission only: human description of the action
+	ToolName  string          // EventPermission only
+	Input     json.RawMessage // EventPermission only: raw tool input
 }
 
 // apiBrain wraps the original tool-less Messages API chat (plus optional

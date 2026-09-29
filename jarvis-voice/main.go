@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -29,7 +30,14 @@ const (
 
 	// How long a spoken permission question waits for a yes/no.
 	permissionTimeout = 45 * time.Second
+
+	// Upper bound for the exit wrap-up (session summary to Obsidian/memory).
+	wrapUpTimeout = 2 * time.Minute
 )
+
+// wrapUpPrompt is sent to the claude brain when the user quits, so the
+// session log gets written even if they never said goodbye.
+const wrapUpPrompt = `[jarvis-voice] The user just closed Jarvis (this message is automatic, they are no longer listening). Wrap up now without asking anything: following the memory rules in your CLAUDE.md, write this session's summary to Obsidian (what we talked about, decisions, pending items) and update your auto-memory only if something durable came up. If a summary for this session already exists, update it instead of creating another. Any decision, new fact about the user, or pending item is worth saving; skip only if the session was pure small talk. Finish with one short sentence saying what you saved.`
 
 func main() {
 	log.SetOutput(os.Stderr)
@@ -43,8 +51,19 @@ func main() {
 		log.Fatalf("workdir: %v", err)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// First Ctrl+C ends the conversation (and triggers the wrap-up), a second
+	// one quits immediately.
+	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
+	sigs := make(chan os.Signal, 2)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		stop()
+		<-sigs
+		fmt.Println("\nforced exit")
+		os.Exit(130)
+	}()
 
 	fmt.Printf("%s v%s\n", appName, appVersion)
 	fmt.Printf("  brain   : %s\n", cfg.Brain)
@@ -83,6 +102,10 @@ func main() {
 	utterances := startInput(ctx, cfg, listener, stop)
 	s := &session{ctx: ctx, brain: brain, speaker: speaker, ptt: cfg.Mode == "ptt"}
 	s.run(utterances)
+	if cfg.Brain == "claude" && cfg.WrapUp {
+		s.wrapUp()
+	}
+	fmt.Println("bye")
 }
 
 func buildBrain(cfg *Config) (Brain, error) {
@@ -200,6 +223,7 @@ type session struct {
 	ptt     bool
 
 	busy     bool
+	turns    int // user turns sent this run
 	queued   []string
 	perm     *BrainEvent // pending permission question
 	permTime *time.Timer
@@ -215,7 +239,7 @@ func (s *session) run(utterances <-chan string) {
 
 		select {
 		case <-s.ctx.Done():
-			fmt.Println("\nbye")
+			fmt.Println()
 			return
 
 		case u := <-utterances:
@@ -302,6 +326,7 @@ func (s *session) send(text string) {
 		return
 	}
 	s.busy = true
+	s.turns++
 	fmt.Println("• thinking...")
 }
 
@@ -330,12 +355,109 @@ func (s *session) stopPermTimer() {
 }
 
 func (s *session) say(text string) {
+	s.sayCtx(s.ctx, text)
+}
+
+func (s *session) sayCtx(ctx context.Context, text string) {
 	if s.speaker == nil {
 		return
 	}
-	if err := s.speaker.Say(s.ctx, text); err != nil && s.ctx.Err() == nil {
+	if err := s.speaker.Say(ctx, text); err != nil && ctx.Err() == nil {
 		log.Printf("speak: %v", err)
 	}
+}
+
+// wrapUp asks the brain to log the session before exiting. The user is gone
+// by now, so permissions can't be asked out loud: only writes to Obsidian and
+// to Claude Code's auto-memory are approved, everything else is denied.
+func (s *session) wrapUp() {
+	if s.turns == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wrapUpTimeout)
+	defer cancel()
+
+	// Settle whatever was in flight when the user quit.
+	if s.perm != nil {
+		s.answerPermission(false, "The user closed Jarvis before answering.")
+	}
+	if s.busy {
+		if err := s.brain.Interrupt(); err != nil {
+			log.Printf("interrupt: %v", err)
+		}
+		if !s.drainUntilDone(ctx, false) {
+			return
+		}
+	}
+
+	fmt.Println("• saving session summary... (Ctrl+C again to skip)")
+	s.sayCtx(ctx, "Dale, guardo el resumen de la sesión.")
+	if err := s.brain.Send(wrapUpPrompt); err != nil {
+		log.Printf("wrap-up: %v", err)
+		return
+	}
+	s.drainUntilDone(ctx, true)
+}
+
+// drainUntilDone consumes brain events until the turn ends. With verbose it
+// prints progress; permission requests go through wrapUpAllowed.
+func (s *session) drainUntilDone(ctx context.Context, verbose bool) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("  ✖  wrap-up timed out")
+			return false
+		case ev := <-s.brain.Events():
+			switch ev.Kind {
+			case EventText:
+				if verbose {
+					fmt.Printf("  jarvis: %s\n", ev.Text)
+				}
+			case EventTool:
+				if verbose {
+					fmt.Printf("  ⚙  %s\n", ev.Text)
+				}
+			case EventPermission:
+				allow := wrapUpAllowed(ev.ToolName, ev.Input)
+				reason := ""
+				if !allow {
+					reason = "Only Obsidian and auto-memory writes are allowed during the exit wrap-up."
+				}
+				if verbose {
+					fmt.Printf("  %s %s\n", map[bool]string{true: "✔", false: "✖"}[allow], ev.Prompt)
+				}
+				if err := s.brain.Respond(ev.RequestID, allow, reason); err != nil {
+					log.Printf("permission response: %v", err)
+				}
+			case EventError:
+				// An interrupted turn always ends in an error result; only
+				// report errors from the wrap-up turn itself.
+				if verbose {
+					fmt.Printf("  ✖  %s\n", ev.Text)
+				}
+			case EventDone:
+				return true
+			}
+		}
+	}
+}
+
+// wrapUpAllowed is the unattended allowlist for the exit wrap-up.
+func wrapUpAllowed(tool string, input json.RawMessage) bool {
+	switch tool {
+	case "mcp__obsidian-vault__write_note", "mcp__obsidian-vault__patch_note",
+		"mcp__obsidian-vault__update_frontmatter", "mcp__obsidian-vault__manage_tags":
+		return true
+	case "Write", "Edit":
+		var in struct {
+			FilePath string `json:"file_path"`
+		}
+		_ = json.Unmarshal(input, &in)
+		p := filepath.ToSlash(filepath.Clean(in.FilePath))
+		return strings.Contains(p, "/.claude/projects/") && strings.Contains(p, "/memory/") &&
+			!strings.Contains(p, "..")
+	}
+	return false
 }
 
 func (s *session) promptIdle() {

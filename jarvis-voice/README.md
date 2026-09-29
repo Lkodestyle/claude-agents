@@ -38,6 +38,12 @@ go build -o ../bin/jarvis-voice .
 Just talk. Jarvis answers when you pause (~1.2s). While it speaks the mic is
 muted so it never hears itself. **Enter** pauses/resumes the mic, **Ctrl+C** quits.
 
+On **Ctrl+C** Jarvis first writes the session summary (Obsidian + auto-memory,
+following the persona's memory rules) and then exits; press Ctrl+C again to
+skip it. The user is gone at that point, so only Obsidian and auto-memory
+writes are auto-approved — anything else is denied. Disable with
+`JARVIS_VOICE_WRAPUP=off`.
+
 ## How turns work
 
 - **Actions need your spoken OK.** Read-only tools (files, web, calendar/mail
@@ -68,6 +74,7 @@ The Claude Code session runs in `~/.jarvis/workspace`. On first run a
 | `JARVIS_VOICE_ALLOWED_TOOLS` | read-only set | Tools that never need confirmation, comma-separated (replaces the default) |
 | `JARVIS_VOICE_PERMISSION_MODE` | `manual` | Claude Code permission mode for the session |
 | `JARVIS_VOICE_CONTINUE` | off | `on` = resume the last Jarvis conversation |
+| `JARVIS_VOICE_WRAPUP` | on | `off` = skip the session summary on exit |
 | `JARVIS_VOICE_MEMORY` | off | `on` = give the brain the `jarvis-memory` MCP |
 | `JARVIS_VOICE_RECORD_SEC` | `8` | Recording window in `ptt` mode |
 | `JARVIS_VOICE_INPUT` / `JARVIS_VOICE_INPUT_NAME` | auto | Mic override (full ffmpeg spec / name substring) |

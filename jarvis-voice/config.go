@@ -83,6 +83,10 @@ type Config struct {
 	// (JARVIS_VOICE_CONTINUE=on).
 	Continue bool
 
+	// Ask the brain to write the session summary on exit
+	// (JARVIS_VOICE_WRAPUP, on by default; "off" disables).
+	WrapUp bool
+
 	// --- live listening ---
 
 	// RMS level (int16 scale) that opens the local voice gate. 0 = calibrate
@@ -161,6 +165,7 @@ func loadConfig() (*Config, error) {
 		AllowedTools:   splitList(os.Getenv("JARVIS_VOICE_ALLOWED_TOOLS")),
 		VADThreshold:   getenvInt("JARVIS_VOICE_VAD_RMS", 0),
 		Continue:       getenvBool("JARVIS_VOICE_CONTINUE"),
+		WrapUp:         os.Getenv("JARVIS_VOICE_WRAPUP") != "off",
 	}
 
 	if len(cfg.AllowedTools) == 0 {

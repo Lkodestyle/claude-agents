@@ -118,6 +118,7 @@ func (b *claudeBrain) start(continueLast bool) error {
 	cmd := exec.Command(b.cfg.ClaudeBin, b.args(continueLast)...)
 	cmd.Dir = b.cfg.Workspace
 	cmd.Env = claudeEnv()
+	detachFromTerminalSignals(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -330,6 +331,8 @@ func (b *claudeBrain) handle(ev streamEvent) {
 			Kind:      EventPermission,
 			RequestID: ev.RequestID,
 			Prompt:    describeAction(req),
+			ToolName:  req.ToolName,
+			Input:     req.Input,
 		}
 
 	case "result":
