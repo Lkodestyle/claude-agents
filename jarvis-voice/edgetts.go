@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -33,19 +34,29 @@ import (
 const (
 	edgeTrustedClientToken = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
 	edgeTTSURL             = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + edgeTrustedClientToken
-	edgeGECVersion         = "1-131.0.2903.86"
-	edgeUserAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+	edgeGECVersion         = "1-143.0.3650.75"
+	edgeUserAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0"
 	edgeOrigin             = "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold"
 )
 
 func edgeTTS(ctx context.Context, voice, text, outPath string) error {
+	// Mirrors python edge-tts 7.2.x: the GEC token travels as query params
+	// (sending it as headers now gets a 403), plus a ConnectionId and a
+	// random MUID cookie.
 	headers := http.Header{}
-	headers.Set("Sec-MS-GEC", generateSecMsGec())
-	headers.Set("Sec-MS-GEC-Version", edgeGECVersion)
 	headers.Set("User-Agent", edgeUserAgent)
 	headers.Set("Origin", edgeOrigin)
+	headers.Set("Pragma", "no-cache")
+	headers.Set("Cache-Control", "no-cache")
+	headers.Set("Accept-Language", "en-US,en;q=0.9")
+	headers.Set("Cookie", "muid="+randomHexUpper(16)+";")
 
-	c, _, err := websocket.Dial(ctx, edgeTTSURL, &websocket.DialOptions{
+	wsURL := edgeTTSURL +
+		"&ConnectionId=" + strings.ReplaceAll(uuid.NewString(), "-", "") +
+		"&Sec-MS-GEC=" + generateSecMsGec() +
+		"&Sec-MS-GEC-Version=" + edgeGECVersion
+
+	c, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
 		HTTPHeader: headers,
 	})
 	if err != nil {
@@ -125,6 +136,12 @@ func generateSecMsGec() string {
 	ticks -= ticks % interval
 	h := sha256.Sum256([]byte(fmt.Sprintf("%d%s", ticks, edgeTrustedClientToken)))
 	return strings.ToUpper(hex.EncodeToString(h[:]))
+}
+
+func randomHexUpper(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return strings.ToUpper(hex.EncodeToString(b))
 }
 
 func escapeXML(s string) string {

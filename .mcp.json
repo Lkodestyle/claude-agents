@@ -3,22 +3,34 @@
     "memory": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
     },
     "context7": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"]
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
     },
     "supabase": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@supabase/mcp-server-supabase@latest"]
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest"
+      ]
     },
     "notion": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
       "env": {
         "NOTION_TOKEN": "${NOTION_TOKEN}"
       }
@@ -32,10 +44,9 @@
     },
     "jarvis-memory": {
       "type": "stdio",
-      "command": "C:\\Users\\lucri\\OneDrive\\Escritorio\\claude-code\\claude-agents\\claude-agents\\bin\\jarvis-memory.exe"
+      "command": "${JARVIS_MEMORY_BIN:-bin/jarvis-memory}"
     }
   },
-
   "_mcp_proxy_config": {
     "description": "Alternative: Use mcp-proxy to aggregate all servers into one endpoint",
     "setup_instructions": [

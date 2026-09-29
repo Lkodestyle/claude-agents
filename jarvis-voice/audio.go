@@ -46,11 +46,11 @@ func recordWAV(ctx context.Context, outPath string, dur time.Duration) error {
 
 // ResolveInputDevice picks an ffmpeg input spec (e.g. "audio=Micrófono (...)")
 // for the current OS. Override priority:
-//   1. JARVIS_VOICE_INPUT env var — full ffmpeg input spec, used as-is.
-//   2. JARVIS_VOICE_INPUT_NAME env var — substring match against detected
-//      audio device names (case-insensitive).
-//   3. Auto-detect: enumerate audio devices, prefer known headset brands.
-//   4. Fall back to OS-typical defaults.
+//  1. JARVIS_VOICE_INPUT env var — full ffmpeg input spec, used as-is.
+//  2. JARVIS_VOICE_INPUT_NAME env var — substring match against detected
+//     audio device names (case-insensitive).
+//  3. Auto-detect: enumerate audio devices, prefer known headset brands.
+//  4. Fall back to OS-typical defaults.
 //
 // Result is cached for the lifetime of the process — no need to re-scan
 // every turn.
@@ -85,29 +85,23 @@ func platformRecordArgs(dur time.Duration) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return []string{
+		"-loglevel", "error",
+		"-f", inputFormat(),
+		"-i", input,
+		"-t", secs,
+	}, nil
+}
 
+// inputFormat is the ffmpeg capture backend for the current OS.
+func inputFormat() string {
 	switch runtime.GOOS {
 	case "windows":
-		return []string{
-			"-loglevel", "error",
-			"-f", "dshow",
-			"-i", input,
-			"-t", secs,
-		}, nil
+		return "dshow"
 	case "darwin":
-		return []string{
-			"-loglevel", "error",
-			"-f", "avfoundation",
-			"-i", input,
-			"-t", secs,
-		}, nil
+		return "avfoundation"
 	default:
-		return []string{
-			"-loglevel", "error",
-			"-f", "alsa",
-			"-i", input,
-			"-t", secs,
-		}, nil
+		return "alsa"
 	}
 }
 
