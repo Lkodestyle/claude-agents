@@ -54,3 +54,7 @@ venv/
 .env.*
 secrets.yml
 credentials.json
+
+# Local go build output inside the module dir
+jarvis-voice/jarvis-voice
+jarvis-voice/jarvis-voice.exe
