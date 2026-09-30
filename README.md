@@ -5,12 +5,11 @@ A comprehensive collection of specialized AI agents for Claude Code, focused on 
 ## Features
 
 - **15 Specialized Agents** - DevOps, Cloud, IaC, and development expertise
-- **9 Slash Commands** - `/commit`, `/pr`, `/review`, `/test`, `/explain`, `/refactor`, `/debug`, `/doc`, `/jarvis`
+- **8 Slash Commands** - `/commit`, `/pr`, `/review`, `/test`, `/explain`, `/refactor`, `/debug`, `/doc`
 - **Cognitive Context Router** - Intelligent agent activation based on conversation keywords
 - **Pool Coordinator** - Multi-instance coordination for teams
 - **Memory Manager** - MCP memory management utilities
 - **MCP Servers** - Pre-configured servers for memory, docs, and integrations
-- **Jarvis** - Voice assistant (STT → Claude → TTS) with optional semantic memory, in pure Go
 
 ## Quick Start
 
@@ -67,7 +66,6 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 | `/refactor` | Suggest and apply refactoring | `/refactor src/legacy.ts` |
 | `/debug` | Help debug errors | `/debug "TypeError: cannot read..."` |
 | `/doc` | Generate documentation | `/doc src/api/` |
-| `/jarvis` | Toggle Jarvis personality mode (on/off/status) | `/jarvis on` |
 
 ## Skills
 
@@ -243,49 +241,10 @@ python3 .claude/scripts/memory-manager.py import backup.json
 - Memory stats show > 20,000 estimated tokens
 - Starting a fresh project context
 
-## Jarvis — Voice + Semantic Memory
+## Jarvis
 
-Two Go sub-projects (pure Go, no CGO — a single cross-platform binary each) plus a persona mode:
-
-| Piece | What it is | Where |
-|-------|------------|-------|
-| `jarvis-memory` | MCP server with local semantic memory: `remember`, `recall`, `forget`, `reflect` over an embedded vector DB (chromem-go) | `mcp-servers/jarvis-memory/` |
-| `jarvis-voice` | Push-to-talk voice loop: mic → Deepgram STT → Claude → Edge TTS → speaker | `jarvis-voice/` |
-| `/jarvis` mode | Persona toggle for Claude Code (`/jarvis on\|off\|status`), injected by a `UserPromptSubmit` hook | `.claude/commands/jarvis.md` |
-
-### jarvis-memory (MCP server)
-
-```bash
-# Build (registered in .mcp.json)
-./scripts/build-jarvis-memory.sh
-```
-
-Embeddings provider is resolved at startup: **Voyage AI** if `VOYAGE_API_KEY` is set
-(asymmetric document/query embeddings), OpenAI if `JARVIS_USE_OPENAI=true`, otherwise
-**Ollama** fully local. Data persists in `~/.jarvis/memory` (`JARVIS_DATA_DIR` to override).
-
-### jarvis-voice
-
-Requires Go 1.25+, `ffmpeg`/`ffplay` on PATH, and `DEEPGRAM_API_KEY` + `ANTHROPIC_API_KEY`
-(a repo-root `.env` is loaded automatically).
-
-```bash
-cd jarvis-voice && go run .
-```
-
-**Semantic memory is opt-in.** By default the loop is stateless between sessions. To make
-the voice assistant remember, build `jarvis-memory` and enable it:
-
-```bash
-export JARVIS_VOICE_MEMORY=on        # off by default — zero overhead when off
-# optional: export JARVIS_MEMORY_BIN=/path/to/jarvis-memory
-cd jarvis-voice && go run .
-```
-
-When enabled, jarvis-voice connects to `jarvis-memory` as an MCP client (stdio): each turn
-recalls relevant memories into the system prompt, and the exchange is persisted while the
-reply plays. If the memory server is unavailable, the loop degrades gracefully to the
-stateless mode — memory never blocks the voice pipeline.
+Jarvis (voice assistant + semantic memory) vive ahora en su propio repo:
+https://github.com/Lkodestyle/jarvis
 
 ## MCP Servers
 
@@ -298,7 +257,6 @@ Pre-configured MCP servers in `.mcp.json`:
 | `supabase` | Supabase project interaction | OAuth (automatic) |
 | `notion` | Notion workspace access | `NOTION_TOKEN` env var |
 | `obsidian` | Obsidian vault read/write/search | `OBSIDIAN_API_KEY` + Local REST API plugin |
-| `jarvis-memory` | Local semantic memory (embedded vector DB) | Build with `./scripts/build-jarvis-memory.sh` |
 
 ### Obsidian Vault Setup
 
@@ -423,11 +381,6 @@ Add to `.claude/settings.json`:
 | `OBSIDIAN_API_KEY` | API key from Local REST API plugin | For Obsidian MCP |
 | `MCP_PROXY_TOKEN` | Token for mcp-proxy auth | For mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Token limit for MCP (default: 25000) | No |
-| `DEEPGRAM_API_KEY` | Deepgram STT for jarvis-voice | For jarvis-voice |
-| `VOYAGE_API_KEY` | Voyage AI embeddings for jarvis-memory | Recommended for jarvis-memory |
-| `JARVIS_VOICE_MEMORY` | Enable semantic memory in jarvis-voice (`on`/`off`, default off) | No |
-| `JARVIS_MEMORY_BIN` | Explicit path to the jarvis-memory binary | No |
-| `JARVIS_DATA_DIR` | Memory store location (default: `~/.jarvis/memory`) | No |
 
 ## Project Structure
 
@@ -460,7 +413,6 @@ claude-agents/
 │   │   ├── debug.md
 │   │   ├── doc.md
 │   │   ├── explain.md
-│   │   ├── jarvis.md
 │   │   ├── pr.md
 │   │   ├── refactor.md
 │   │   ├── review.md

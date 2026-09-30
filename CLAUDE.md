@@ -166,7 +166,7 @@ superpowers:verification-before-completion → Validar resultados
 
 ## Comandos (Slash Commands)
 
-Este repositorio incluye **9 comandos** listos para usar:
+Este repositorio incluye **8 comandos** listos para usar (Jarvis, el asistente por voz, vive ahora en su propio repo: https://github.com/Lkodestyle/jarvis):
 
 | Comando | Descripcion | Uso |
 |---------|-------------|-----|
@@ -178,7 +178,6 @@ Este repositorio incluye **9 comandos** listos para usar:
 | `/refactor` | Sugiere y aplica refactoring | `/refactor src/legacy.ts` |
 | `/debug` | Ayuda a debuggear errores | `/debug "TypeError: cannot read..."` |
 | `/doc` | Genera documentacion (README, JSDoc, docstrings) | `/doc src/api/` |
-| `/jarvis` | Activa/desactiva el modo de personalidad Jarvis | `/jarvis on` |
 
 ### Ejemplos de Uso
 
@@ -417,8 +416,7 @@ claude-agents/
 │   │   ├── explain.md        # /explain - Explain code
 │   │   ├── refactor.md       # /refactor - Suggest refactoring
 │   │   ├── debug.md          # /debug - Debug errors
-│   │   ├── doc.md            # /doc - Generate docs
-│   │   └── jarvis.md         # /jarvis - Toggle Jarvis mode
+│   │   └── doc.md            # /doc - Generate docs
 │   ├── skills/               # Skills (guia + workflows)
 │   │   ├── agents-hub/       # Guia de routing de agentes (entry point)
 │   │   ├── deploy-pipeline/  # CI/CD + Docker + Cloud
@@ -564,11 +562,6 @@ Para mas info sobre hooks, ejecuta `/hooks` en Claude Code.
 | `OBSIDIAN_API_KEY` | API key del plugin Local REST API de Obsidian | Para MCP Obsidian |
 | `MCP_PROXY_TOKEN` | Token para mcp-proxy | Para mcp-proxy |
 | `MAX_MCP_OUTPUT_TOKENS` | Limite de tokens para MCP (default: 25000) | No |
-| `DEEPGRAM_API_KEY` | STT de jarvis-voice | Para jarvis-voice |
-| `VOYAGE_API_KEY` | Embeddings de jarvis-memory | Recomendada para jarvis-memory |
-| `JARVIS_VOICE_MEMORY` | Memoria semantica en jarvis-voice (`on`/`off`, default off) | No |
-| `JARVIS_MEMORY_BIN` | Path explicito al binario jarvis-memory | No |
-| `JARVIS_DATA_DIR` | Ubicacion del store de memoria (default `~/.jarvis/memory`) | No |
 
 **Tip:** Si memory o MCP servers causan problemas de tokens:
 ```bash

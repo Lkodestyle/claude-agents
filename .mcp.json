@@ -41,10 +41,6 @@
       "headers": {
         "Authorization": "Bearer ${OBSIDIAN_API_KEY}"
       }
-    },
-    "jarvis-memory": {
-      "type": "stdio",
-      "command": "${JARVIS_MEMORY_BIN:-bin/jarvis-memory}"
     }
   },
   "_mcp_proxy_config": {

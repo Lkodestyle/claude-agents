@@ -14,11 +14,6 @@ memory.db-journal
 memory.db-shm
 memory.db-wal
 
-# Jarvis
-bin/
-.jarvis-smoke/
-.jarvis/
-
 # OS files
 .DS_Store
 Thumbs.db
@@ -54,7 +49,3 @@ venv/
 .env.*
 secrets.yml
 credentials.json
-
-# Local go build output inside the module dir
-jarvis-voice/jarvis-voice
-jarvis-voice/jarvis-voice.exe
