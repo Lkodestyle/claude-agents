@@ -79,6 +79,10 @@ mkdir -p ~/.claude/pool
 python3 ~/.claude/scripts/memory-manager.py stats
 ```
 
+## Jarvis Moved to Its Own Repo
+
+Jarvis se movió a su propio repo (https://github.com/Lkodestyle/jarvis); si tenías `bin/jarvis-*` o el MCP `jarvis-memory` registrado, ver el README del nuevo repo.
+
 ## Verify Upgrade
 
 ```bash
