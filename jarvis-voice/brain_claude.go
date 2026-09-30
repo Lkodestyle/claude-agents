@@ -359,6 +359,10 @@ func describeAction(req permissionRequest) string {
 		s, _ := in[k].(string)
 		return truncate(strings.TrimSpace(s), 120)
 	}
+	base := func(k string) string {
+		s, _ := in[k].(string)
+		return filepath.Base(strings.TrimSpace(s))
+	}
 
 	switch req.ToolName {
 	case "Bash":
@@ -367,11 +371,11 @@ func describeAction(req permissionRequest) string {
 		}
 		return "correr el comando " + str("command")
 	case "Write":
-		return "escribir el archivo " + filepath.Base(str("file_path"))
+		return "escribir el archivo " + base("file_path")
 	case "Edit", "MultiEdit":
-		return "editar el archivo " + filepath.Base(str("file_path"))
+		return "editar el archivo " + base("file_path")
 	case "NotebookEdit":
-		return "editar el notebook " + filepath.Base(str("notebook_path"))
+		return "editar el notebook " + base("notebook_path")
 	}
 
 	if strings.HasPrefix(req.ToolName, "mcp__") {

@@ -53,9 +53,7 @@ const (
 	frameBytes     = sampleRate * 2 * frameMs / 1000 // s16le mono
 	prerollFrames  = 15                              // 300ms kept before the gate opens
 	openFrames     = 3                               // 60ms above threshold to open
-	gateHangover   = 1500 * time.Millisecond         // silence before the gate closes
 	keepAliveEvery = 5 * time.Second                 // Deepgram drops idle sockets at ~10s
-	utteranceEndMs = "1200"                          // pause that ends a turn
 )
 
 func NewListener(cfg *Config) *Listener {
@@ -63,6 +61,13 @@ func NewListener(cfg *Config) *Listener {
 }
 
 func (l *Listener) Utterances() <-chan string { return l.out }
+
+// gateHangover is how long the gate stays open after the last loud frame.
+// It outlasts Deepgram's utterance-end pause so the turn is decided there,
+// not cut short by our Finalize.
+func (l *Listener) gateHangover() time.Duration {
+	return time.Duration(l.cfg.PauseMs+500) * time.Millisecond
+}
 
 // SetMuted is called by the speaker around playback.
 func (l *Listener) SetMuted(m bool) { l.muted.Store(m) }
@@ -169,7 +174,7 @@ func (l *Listener) Run(ctx context.Context) error {
 		lastSend = now
 		if level >= l.threshold {
 			lastLoud = now
-		} else if now.Sub(lastLoud) > gateHangover {
+		} else if now.Sub(lastLoud) > l.gateHangover() {
 			closeGate()
 		}
 	}
@@ -226,7 +231,7 @@ func (l *Listener) dial(ctx context.Context) (*websocket.Conn, error) {
 	q.Set("punctuate", "true")
 	q.Set("interim_results", "true") // required for UtteranceEnd
 	q.Set("endpointing", "400")
-	q.Set("utterance_end_ms", utteranceEndMs)
+	q.Set("utterance_end_ms", fmt.Sprint(l.cfg.PauseMs))
 
 	h := http.Header{}
 	h.Set("Authorization", "Token "+l.cfg.DeepgramKey)

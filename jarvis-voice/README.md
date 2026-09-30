@@ -46,10 +46,20 @@ writes are auto-approved — anything else is denied. Disable with
 
 ## How turns work
 
-- **Actions need your spoken OK.** Read-only tools (files, web, calendar/mail
-  reads, memory) run freely. Anything else — writing files, Bash, sending mail,
-  creating events — makes Jarvis ask "Necesito tu ok para ... ¿Lo hago?".
-  Answer "sí / dale" or "no". Any "no" in the answer wins; silence for 45s = no.
+- **Only sensitive actions need your spoken OK.** Routine work — reading,
+  searching, writing notes and project files, creating calendar events, drafts,
+  everyday commands — runs silently. Jarvis asks "¿Confirmás ...?" only for
+  sending mail, deleting anything, `git push`/`reset --hard`, `rm`, `sudo`,
+  infra changes (terraform apply, kubectl, aws/az mutations...), package
+  installs, and writes to dotfiles, `.env` or outside your home (the workspace
+  and `~/proyectos` are always fine). Tune with `JARVIS_VOICE_CONFIRM`.
+- **Answering.** A short beep marks the moment the mic reopens. Your first
+  words decide: "sí / dale..." approves (anything you add after is passed on
+  as an instruction), "no..." denies, and a longer reply without either
+  ("mandalo a Juan en vez de Pedro") is taken as a correction. No answer: it
+  asks once more after 20s, then gives up.
+- **Pauses.** A turn ends after 1.5s of silence; if you trail off on "y...",
+  "o sea...", "que...", Jarvis waits a bit longer for the rest.
 - **Stop a running task** by saying a short "pará" / "cancelá" / "stop".
 - Anything else you say while it's working is queued for the next turn.
 
@@ -73,6 +83,9 @@ The Claude Code session runs in `~/.jarvis/workspace`. On first run a
 | `JARVIS_VOICE_ADD_DIRS` | `~/proyectos` | Extra readable dirs, comma-separated |
 | `JARVIS_VOICE_ALLOWED_TOOLS` | read-only set | Tools that never need confirmation, comma-separated (replaces the default) |
 | `JARVIS_VOICE_PERMISSION_MODE` | `manual` | Claude Code permission mode for the session |
+| `JARVIS_VOICE_CONFIRM` | `sensitive` | `sensitive` (ask only for risky actions), `all` (ask for everything), `none` |
+| `JARVIS_VOICE_PAUSE_MS` | `1500` | Silence that ends your turn |
+| `JARVIS_VOICE_EARCON` | on | `off` = no beep when the mic reopens after a question |
 | `JARVIS_VOICE_CONTINUE` | off | `on` = resume the last Jarvis conversation |
 | `JARVIS_VOICE_WRAPUP` | on | `off` = skip the session summary on exit |
 | `JARVIS_VOICE_MEMORY` | off | `on` = give the brain the `jarvis-memory` MCP |
