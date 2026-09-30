@@ -315,6 +315,10 @@ def log_attention_history(claude_dir: Path, state: dict, hot: List[str], warm: L
 
 def main():
     """Main context routing logic."""
+    # Jarvis voice sessions must skip the router: no agent-context injection
+    if os.environ.get("JARVIS_VOICE") == "1":
+        return
+
     # Get directories
     claude_dir = get_claude_dir()
 
