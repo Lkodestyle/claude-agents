@@ -2,7 +2,7 @@
 name: architecture
 description: Cloud-native solutions architect. USE PROACTIVELY for system design, microservices, C4/Mermaid diagrams, ADRs, and architecture decisions. MUST BE USED when discussing trade-offs, scalability, availability, architecture patterns, or high-level design.
 tools: Read, Glob, Grep, Edit, Write
-model: sonnet
+model: opus
 ---
 
 # Architecture Agent
