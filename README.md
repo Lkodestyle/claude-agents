@@ -341,13 +341,24 @@ Commands:
 
 ## Hooks
 
-Claude Code hooks are configured in `.claude/settings.json`:
+The hooks are defined once in `scripts/hooks.json` and installed by
+`claude-agents-cli.sh install` into your **global** `~/.claude/settings.json`:
 
 | Hook | Script | Function |
 |------|--------|----------|
 | `UserPromptSubmit` | `context-router.py` | Activate agents based on keywords |
 | `SessionStart` | `pool-loader.py` | Load state from other instances |
 | `Stop` | `pool-extractor.py` | Save completion signals |
+
+The installer **merges** into your existing `settings.json`: it only replaces
+hooks that reference these three scripts and leaves everything else (model,
+theme, other tools' hooks, your own permissions) untouched. A copy of the
+previous file is kept as `settings.json.backup.<timestamp>`.
+
+The repo's own `.claude/settings.json` deliberately contains **no hooks**: if a
+project declares the same hooks as the global settings, Claude Code runs them
+twice per event. `claude-agents-cli.sh status` reports how many times each hook
+would run.
 
 **Protect sensitive files:**
 

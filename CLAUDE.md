@@ -447,7 +447,10 @@ Los hooks permiten ejecutar comandos automaticamente en diferentes momentos del 
 
 ### Hooks Cognitivos Incluidos
 
-Este repositorio configura automaticamente los siguientes hooks en `.claude/settings.json`:
+Los hooks se definen una sola vez en `scripts/hooks.json` y el instalador los
+**mergea** en tu `~/.claude/settings.json` global (sin pisar model, theme ni hooks
+de otras herramientas). El `.claude/settings.json` del repo NO declara hooks a
+proposito: si proyecto y global tienen el mismo hook, corre dos veces por evento.
 
 | Hook | Script | Funcion |
 |------|--------|---------|
@@ -496,13 +499,18 @@ depender del directorio actual:
 hooks de tools (`PreToolUse`/`PostToolUse`); en eventos como `UserPromptSubmit`, `Stop` o
 `SessionStart` se omite.
 
-Para una instalacion **global**, el instalador (`claude-agents-cli.sh install`) genera el
-`~/.claude/settings.json` con **rutas absolutas** al directorio de scripts y el binario de
-Python detectado (`python3`/`python`/`py -3`), por ejemplo:
+Para la instalacion **global**, el instalador (`claude-agents-cli.sh install`) escribe los
+hooks con la forma portable `$HOME/.claude/scripts/<script>.py` y el binario de Python
+detectado (`python3`/`python`/`py -3`), por ejemplo:
 
 ```json
-"command": "python3 \"/home/usuario/.claude/scripts/context-router.py\""
+"command": "python3 \"$HOME/.claude/scripts/context-router.py\""
 ```
+
+Agentes, scripts, commands y skills se instalan **entrada por entrada** (un symlink o
+copia por archivo/carpeta), asi que conviven con skills de plugins o commands propios que
+tengas en `~/.claude`. `claude-agents-cli.sh status` muestra el modo de instalacion y cuantas
+veces correria cada hook.
 
 ### Ejemplos Utiles
 
