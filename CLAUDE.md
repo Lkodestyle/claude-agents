@@ -168,7 +168,8 @@ Ejecuta `/agents` en Claude Code para ver y gestionar los agentes.
 
 ## Workflow Skills
 
-Este repositorio incluye una **skill guia** (`agents-hub`) mas **5 workflow skills** que orquestan multiples agentes para flujos completos:
+Este repositorio incluye una **skill guia** (`agents-hub`), **3 skills de dia a dia** (sesion y
+git, transversales a cualquier proyecto) y **5 workflow skills** que orquestan multiples agentes:
 
 | Skill | Agentes | Descripcion |
 |-------|---------|-------------|
@@ -178,6 +179,14 @@ Este repositorio incluye una **skill guia** (`agents-hub`) mas **5 workflow skil
 | `infrastructure-as-code` | terraform, networking, aws/azure, security, architecture | IaC completo: VPC + modulos Terraform + multi-ambiente |
 | `security-hardening` | security, docker, cicd, aws/azure | Audit de seguridad: dependencias + secrets + containers + pipeline |
 | `full-stack-scaffold` | architecture, web/mobile, databases, programming, docker | Scaffolding: API + DB + frontend + Docker Compose + tests |
+| `session-resume` | - | "Por donde nos quedamos": reconstruye contexto desde el vault de Obsidian de ESTA maquina (`~/.claude/vault.json`), git, PRs abiertos y archivos de plan |
+| `session-save` | - | "Anota todo en el vault": nota de sesion + estado del proyecto + indice, segun las rules del vault; muestra el borrador antes de escribir |
+| `git-flow` | - | "Commitealo y abri el PR": branch desde la base correcta, conventional commits sin Co-Authored-By, PR en el idioma del repo, confirmacion antes de push/merge, verificacion post-merge |
+
+**Vaults por maquina.** Las skills de sesion leen `~/.claude/vault.json` (ruta del vault, MCP
+a usar, carpeta de proyectos, nota indice, nota de rules). Es local y nunca se commitea: cada
+PC (personal, trabajo) tiene su propio vault y la misma skill. Si falta, la skill pregunta una
+vez y lo crea. El hook `session-health.py` avisa al arrancar si el vault no esta accesible.
 
 Los skills se instalan automaticamente con `claude-agents-cli.sh install` en `.claude/skills/`.
 
@@ -418,7 +427,10 @@ claude-agents/
 │   │   ├── observability-setup/ # Monitoring + Logging + Alerting
 │   │   ├── infrastructure-as-code/ # Terraform + Networking + Cloud
 │   │   ├── security-hardening/    # Security audit + fix + compliance
-│   │   └── full-stack-scaffold/   # Project scaffolding completo
+│   │   ├── full-stack-scaffold/   # Project scaffolding completo
+│   │   ├── session-resume/   # Retomar: vault + git + PRs -> donde quedamos
+│   │   ├── session-save/     # Cerrar: nota de sesion + estado + indice en el vault
+│   │   └── git-flow/         # Commits + PR + merge con las convenciones del repo
 │   ├── scripts/              # Scripts utilitarios
 │   │   ├── context-router.py # Activacion inteligente
 │   │   ├── pool-loader.py    # Carga estado de pool
@@ -448,8 +460,9 @@ proposito: si proyecto y global tienen el mismo hook, corre dos veces por evento
 
 | Hook | Script | Funcion |
 |------|--------|---------|
-| `UserPromptSubmit` | `context-router.py` | Activa agentes segun keywords |
-| `SessionStart` | `pool-loader.py` | Carga estado de otras instancias |
+| `UserPromptSubmit` | `context-router.py` | Sugiere agentes segun keywords (una linea) |
+| `SessionStart` | `session-health.py` | Avisa si Obsidian/vault/hooks/agentes tienen problemas |
+| `SessionStart` | `pool-loader.py` | Carga estado de otras instancias (solo con CLAUDE_INSTANCE) |
 | `Stop` | `pool-extractor.py` | Guarda senales de completado |
 
 ### Tipos de Hooks Disponibles

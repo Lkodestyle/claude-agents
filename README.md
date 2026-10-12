@@ -72,6 +72,18 @@ Installed automatically with `claude-agents-cli.sh install` into `~/.claude/skil
 |-------|---------|
 | `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains how to fan work out to agents with the Agent tool. Use it at the start of any technical task. |
 
+### Day-to-day Skills
+
+Transversal to any project. They read `~/.claude/vault.json` (per machine, never in
+git) to know which Obsidian vault to use, so the same skill works on a personal PC and
+on a work PC with a different, local-only vault.
+
+| Skill | Triggers on | What it does |
+|-------|-------------|--------------|
+| `session-resume` | "where were we", "por dónde nos quedamos", "retomemos" | Rebuilds context from the vault's project + last session note, git, open PRs and plan files; proposes the next step |
+| `session-save` | "write it to the vault", "anotá todo", "cerremos la sesión" | Dated session note + project status + index in the vault, following its rules; durable facts to memory; shows the draft first |
+| `git-flow` | "commit it", "open the PR", "commitealo y abrí el PR" | Branch from the right base, conventional commits without Co-Authored-By, PR in the repo's language, confirmation before push/merge, post-merge check |
+
 ### Workflow Skills
 
 Complete end-to-end workflows that orchestrate multiple agents together.
@@ -356,7 +368,8 @@ The hooks are defined once in `scripts/hooks.json` and installed by
 | Hook | Script | Function |
 |------|--------|----------|
 | `UserPromptSubmit` | `context-router.py` | Activate agents based on keywords |
-| `SessionStart` | `pool-loader.py` | Load state from other instances |
+| `SessionStart` | `session-health.py` | Warn about Obsidian down, vault not mounted, duplicated hooks, broken agent links |
+| `SessionStart` | `pool-loader.py` | Load state from other instances (only with `CLAUDE_INSTANCE`) |
 | `Stop` | `pool-extractor.py` | Save completion signals |
 
 The installer **merges** into your existing `settings.json`: it only replaces
