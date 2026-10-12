@@ -327,6 +327,7 @@ BACKUP_ROOT="$CLAUDE_HOME/backups/claude-agents-$(date +%Y%m%d_%H%M%S)"
 # but only if its content differs from what we are about to install.
 install_entries() {
     local src_dir="$1" dst_dir="$2" mode="$3" kind="$4"
+    [[ -d "$src_dir" ]] || return 0
 
     # Older installs symlinked the whole folder; turn it back into a real dir.
     if [[ -L "$dst_dir" ]]; then
@@ -396,6 +397,13 @@ remove_entries() {
 # are dead weight: remove them from the install dir and the current project.
 cleanup_legacy_state() {
     local dir f
+    # Slash commands were removed from the repo (never used): drop our old links.
+    for f in "$CLAUDE_HOME"/commands/*; do
+        if [[ -L "$f" && ! -e "$f" && "$(readlink "$f")" == "$REPO_DIR/"* ]]; then
+            rm -f "$f"
+            log_step "Removed stale command link: $f"
+        fi
+    done
     for dir in "$CLAUDE_HOME" "$(pwd)/.claude"; do
         for f in attn_state.json attention_history.jsonl; do
             if [[ -f "$dir/$f" ]]; then
@@ -411,7 +419,6 @@ install_tree() {
     local install_dir="$1" mode="$2"
     install_entries "$REPO_DIR/.claude/agents"   "$install_dir/agents"   "$mode" "agents"
     install_entries "$REPO_DIR/.claude/scripts"  "$install_dir/scripts"  "$mode" "scripts"
-    install_entries "$REPO_DIR/.claude/commands" "$install_dir/commands" "$mode" "commands"
     install_entries "$REPO_DIR/.claude/skills"   "$install_dir/skills"   "$mode" "skills"
 }
 
@@ -544,7 +551,7 @@ cmd_status() {
     fi
 
     local kind state
-    for kind in agents scripts commands skills; do
+    for kind in agents scripts skills; do
         state="$(install_mode_of "$REPO_DIR/.claude/$kind" "$CLAUDE_HOME/$kind")"
         case "$state" in
             "not installed") log_warn "$kind: $state" ;;
@@ -556,7 +563,7 @@ cmd_status() {
     echo ""
     echo -e "${BOLD}Hooks:${NC}"
     local project_settings="$(pwd)/.claude/settings.json"
-    for script in context-router.py pool-loader.py pool-extractor.py; do
+    for script in context-router.py session-health.py pool-loader.py pool-extractor.py; do
         local n_global=0 n_project=0
         [[ -f "$CLAUDE_HOME/settings.json" ]] && n_global=$(grep -c "$script" "$CLAUDE_HOME/settings.json" || true)
         [[ -f "$project_settings" && "$project_settings" != "$CLAUDE_HOME/settings.json" ]] && n_project=$(grep -c "$script" "$project_settings" || true)
@@ -582,17 +589,6 @@ cmd_status() {
         done
     fi
 
-    # List commands
-    echo ""
-    if [[ -d "$GLOBAL_COMMANDS" ]]; then
-        echo -e "${BOLD}Installed Commands ($(ls -1 "$GLOBAL_COMMANDS"/*.md 2>/dev/null | wc -l)):${NC}"
-        for cmd in "$GLOBAL_COMMANDS"/*.md; do
-            if [[ -f "$cmd" ]]; then
-                local name=$(basename "$cmd" .md)
-                printf "  ${GREEN}•${NC} /%s\n" "$name"
-            fi
-        done
-    fi
 
     # List skills
     echo ""
@@ -842,7 +838,6 @@ cmd_uninstall() {
     check_python
     remove_entries "$REPO_DIR/.claude/agents"   "$GLOBAL_AGENTS"   "agents"
     remove_entries "$REPO_DIR/.claude/scripts"  "$GLOBAL_SCRIPTS"  "scripts"
-    remove_entries "$REPO_DIR/.claude/commands" "$GLOBAL_COMMANDS" "commands"
     remove_entries "$REPO_DIR/.claude/skills"   "$GLOBAL_SKILLS"   "skills"
     remove_managed_hooks "$CLAUDE_HOME/settings.json"
 

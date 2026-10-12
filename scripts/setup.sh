@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: ./scripts/setup.sh [--skip-mcp] [--skip-obsidian]"
             echo ""
             echo "Full onboarding for claude-agents:"
-            echo "  1. Install agents, commands, skills, scripts"
+            echo "  1. Install agents, skills, scripts"
             echo "  2. Configure MCP servers (memory, context7, etc.)"
             echo "  3. Setup Obsidian vault with full structure"
             echo "  4. Show recommended plugins"
@@ -56,10 +56,10 @@ echo -e "${BOLD}${MAGENTA}╚═════════════════
 echo ""
 
 # ============================================================================
-# STEP 1: Install agents, commands, skills, scripts
+# STEP 1: Install agents, skills, scripts
 # ============================================================================
 
-echo -e "${BOLD}${CYAN}━━━ Step 1/4: Installing agents, commands, and skills ━━━${NC}"
+echo -e "${BOLD}${CYAN}━━━ Step 1/4: Installing agents and skills ━━━${NC}"
 echo ""
 
 echo -e "Installation mode:"
@@ -171,13 +171,12 @@ echo -e "${BOLD}${MAGENTA}╚═════════════════
 echo ""
 echo -e "${BOLD}What was installed:${NC}"
 echo "  - 15 specialized agents"
-echo "  - 8 slash commands (/commit, /pr, /review-changes, /test, /explain, /refactor, /diagnose, /doc)"
 echo "  - 5 workflow skills (deploy-pipeline, observability, IaC, security, scaffold)"
 echo "  - Cognitive scripts (context router, pool coordinator, memory manager)"
 echo ""
 echo -e "${BOLD}Next steps:${NC}"
 echo "  1. Open a terminal and run: claude"
 echo "  2. The agents activate automatically based on your conversation"
-echo "  3. Use /commit, /pr, /review-changes, etc. for common workflows"
+echo "  3. Ask in natural language; agents and skills pick up the work"
 echo "  4. Check status anytime: ./scripts/claude-agents-cli.sh status"
 echo ""
