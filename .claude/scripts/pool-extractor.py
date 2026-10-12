@@ -230,6 +230,10 @@ def cleanup_old_entries(pool_dir: Path, max_entries: int = 100) -> None:
 
 def main():
     """Main pool extractor logic."""
+    # Opt-in: see pool-loader.py. Without CLAUDE_INSTANCE nobody reads the pool.
+    if not os.environ.get("CLAUDE_INSTANCE"):
+        return
+
     payload = read_hook_payload()
 
     # Loop guard: if this Stop event was itself triggered by a stop hook,

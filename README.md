@@ -5,7 +5,7 @@ A comprehensive collection of specialized AI agents for Claude Code, focused on 
 ## Features
 
 - **15 Specialized Agents** - DevOps, Cloud, IaC, and development expertise
-- **8 Slash Commands** - `/commit`, `/pr`, `/review`, `/test`, `/explain`, `/refactor`, `/debug`, `/doc`
+- **8 Slash Commands** - `/commit`, `/pr`, `/review-changes`, `/test`, `/explain`, `/refactor`, `/diagnose`, `/doc`
 - **Cognitive Context Router** - Intelligent agent activation based on conversation keywords
 - **Pool Coordinator** - Multi-instance coordination for teams
 - **Memory Manager** - MCP memory management utilities
@@ -60,11 +60,11 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 |---------|-------------|---------|
 | `/commit` | Generate conventional commit message | `git add . && /commit` |
 | `/pr` | Create PR with auto-generated description | `/pr` |
-| `/review` | Code review staged changes or files | `/review` or `/review src/file.ts` |
+| `/review-changes` | Code review staged changes or files | `/review-changes` or `/review-changes src/file.ts` |
 | `/test` | Generate unit tests for code | `/test src/utils.ts` |
 | `/explain` | Explain how code works | `/explain src/auth/` |
 | `/refactor` | Suggest and apply refactoring | `/refactor src/legacy.ts` |
-| `/debug` | Help debug errors | `/debug "TypeError: cannot read..."` |
+| `/diagnose` | Help debug errors | `/diagnose "TypeError: cannot read..."` |
 | `/doc` | Generate documentation | `/doc src/api/` |
 
 ## Skills
@@ -75,7 +75,7 @@ Installed automatically with `claude-agents-cli.sh install` into `~/.claude/skil
 
 | Skill | Purpose |
 |-------|---------|
-| `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains proactive invocation via the Task tool. Use it at the start of any technical task. |
+| `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains how to fan work out to agents with the Agent tool. Use it at the start of any technical task. |
 
 ### Workflow Skills
 
@@ -135,56 +135,70 @@ Inspired by [claude-cognitive](https://github.com/GMaN1911/claude-cognitive), th
 
 ### Context Router
 
-The Context Router automatically activates relevant agents based on conversation keywords:
+The Context Router nudges Claude towards the right agents, in one line per prompt:
 
 ```
-User: "Help me deploy a Kubernetes pod with Terraform"
-      ↓ Keywords detected: kubernetes, terraform, deploy
-      ↓ Primary agents: kubernetes, terraform
-      ↓ Co-activated: docker, cicd, networking
+User: "armá un pipeline de github actions que buildee el dockerfile y deploye a ecs"
+      ↓
+[context-router] Suggested agents: cicd, docker, aws · related: networking, terraform · skill: deploy-pipeline
 ```
+
+It does **not** inject the agent files themselves: each subagent already gets
+its own prompt when invoked, so repeating it in the main context only costs
+tokens (the v2 router injected up to 25k chars per prompt).
 
 **How it works:**
 
-1. **Keyword Matching** - Scans prompts for keywords defined in `keywords.json`
-2. **Attention Scores** - Each agent has a score (0.0 - 1.0) based on relevance
-3. **Decay Mechanism** - Unused agents gradually lose attention over time
-4. **Co-activation** - Related agents get a boost when primary agents activate
+1. **Keyword Matching** - whole-word, case- and accent-insensitive, English and Spanish
+2. **Attention Scores** - each agent has a score (0.0 - 1.0); a match sets it to 1.0
+3. **Decay** - scores fade per turn, so a topic from a few prompts ago is still "related"
+4. **Co-activation** - related agents get a boost when a primary agent fires
+5. **Skill hint** - when 2+ agents of a workflow skill are HOT, the skill is suggested
 
-**Activation Tiers:**
+**Tiers:**
 
-| Tier | Score | Injection |
-|------|-------|-----------|
-| HOT | > 0.8 | Full agent content |
-| WARM | 0.25 - 0.8 | Headers only (first 25 lines) |
-| COLD | < 0.25 | Not injected |
+| Tier | Score | Output |
+|------|-------|--------|
+| HOT | >= 0.8 | `Suggested agents:` |
+| WARM | 0.25 - 0.8 | `related:` |
+| COLD | < 0.25 | nothing |
 
-**Configuration:**
+**Where things live:**
 
-Edit `.claude/keywords.json` to customize:
+- Config: `~/.claude/keywords.json` (a project can override it with its own `.claude/keywords.json`)
+- State: `~/.claude/router/<project>.json` — never inside the project tree
+- History: off by default (`"history": true` writes `<project>.history.jsonl` next to the state)
+
+**Configuration** (`keywords.json`):
 
 ```json
 {
+  "output": "compact",            // "full" restores the v2 content injection
+  "history": false,
   "keywords": {
-    "agents/terraform.md": ["terraform", "hcl", "tfvars", "module"],
+    "agents/terraform.md": ["terraform", "hcl", "tfvars", "terragrunt"],
     "agents/aws.md": ["aws", "ec2", "lambda", "s3"]
   },
   "co_activation": {
     "agents/terraform.md": ["agents/aws.md", "agents/networking.md"]
   },
-  "pinned": ["agents/architecture.md"],
-  "thresholds": {
-    "hot": 0.8,
-    "warm": 0.25,
-    "max_hot_files": 4,
-    "max_chars": 25000
-  }
+  "skills": {
+    "infrastructure-as-code": ["terraform", "networking", "aws", "azure"]
+  },
+  "pinned": [],
+  "thresholds": { "hot": 0.8, "warm": 0.25, "max_hot": 4, "max_warm": 4 }
 }
 ```
 
+Keep keywords specific. Generic words (`plan`, `app`, `test`, `state`, `image`)
+fire on unrelated prompts and were removed in v3.
+
 ### Pool Coordinator
 
-Coordinate work across multiple Claude Code instances:
+Coordinate work across multiple Claude Code **terminals** open at the same time
+(you with two sessions, or a team). It is **opt-in**: the hooks exit immediately
+unless `CLAUDE_INSTANCE` is set. Note this is not what runs agents in parallel —
+that is the native `Agent` tool (see the `agents-hub` skill).
 
 ```bash
 # Terminal 1
@@ -341,13 +355,24 @@ Commands:
 
 ## Hooks
 
-Claude Code hooks are configured in `.claude/settings.json`:
+The hooks are defined once in `scripts/hooks.json` and installed by
+`claude-agents-cli.sh install` into your **global** `~/.claude/settings.json`:
 
 | Hook | Script | Function |
 |------|--------|----------|
 | `UserPromptSubmit` | `context-router.py` | Activate agents based on keywords |
 | `SessionStart` | `pool-loader.py` | Load state from other instances |
 | `Stop` | `pool-extractor.py` | Save completion signals |
+
+The installer **merges** into your existing `settings.json`: it only replaces
+hooks that reference these three scripts and leaves everything else (model,
+theme, other tools' hooks, your own permissions) untouched. A copy of the
+previous file is kept as `settings.json.backup.<timestamp>`.
+
+The repo's own `.claude/settings.json` deliberately contains **no hooks**: if a
+project declares the same hooks as the global settings, Claude Code runs them
+twice per event. `claude-agents-cli.sh status` reports how many times each hook
+would run.
 
 **Protect sensitive files:**
 
@@ -410,12 +435,12 @@ claude-agents/
 │   │   └── web.md
 │   ├── commands/             # Slash commands
 │   │   ├── commit.md
-│   │   ├── debug.md
+│   │   ├── diagnose.md
 │   │   ├── doc.md
 │   │   ├── explain.md
 │   │   ├── pr.md
 │   │   ├── refactor.md
-│   │   ├── review.md
+│   │   ├── review-changes.md
 │   │   └── test.md
 │   ├── skills/               # Skills (routing guide + workflows)
 │   │   ├── agents-hub/           # Agent routing guide (entry point)
@@ -435,7 +460,7 @@ claude-agents/
 ├── scripts/
 │   ├── setup.sh              # Full onboarding (runs all setup steps)
 │   └── claude-agents-cli.sh  # CLI installer
-└── templates/                # Reusable templates
+└── templates/                # Reference guides (one README per type: ecs, gh-workflow, gitlab-ci, tf-module)
     ├── ecs-service/
     ├── github-workflow/
     ├── gitlab-ci/

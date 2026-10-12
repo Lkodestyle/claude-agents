@@ -187,6 +187,11 @@ def main():
     Anything printed to stdout is added to Claude's context for the new
     session — that is the supported SessionStart output channel.
     """
+    # Opt-in: the pool only makes sense with several named Claude instances
+    # (CLAUDE_INSTANCE=A, B, ...). Without it there is nothing to coordinate.
+    if not os.environ.get("CLAUDE_INSTANCE"):
+        return
+
     payload = read_hook_payload()
     claude_dir = get_claude_dir()
     pool_dir = claude_dir / "pool"

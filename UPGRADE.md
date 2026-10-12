@@ -7,47 +7,50 @@ How to update your Claude Agents installation without losing your existing memor
 ```
 ~/.claude/
 ├── memory.json              # ✅ YOUR MEMORY - NEVER TOUCHED
-├── attn_state.json          # ✅ Your attention state - preserved
+├── router/                  # ✅ Router state per project - preserved
 ├── attention_history.jsonl  # ✅ Your history - preserved
 ├── pool/                    # ✅ Your pool state - preserved
 ├── settings.local.json      # ✅ Your local settings - preserved
-├── agents/                  # 🔄 Updated
-├── scripts/                 # 🔄 Updated
-├── commands/                # 🔄 Updated
+├── agents/                  # 🔄 Our 15 files updated; anything else you keep there is preserved
+├── scripts/                 # 🔄 Our scripts updated; other tools' scripts preserved
+├── commands/                # 🔄 Our 8 commands updated; your own commands preserved
+├── skills/                  # 🔄 Our 6 skills updated; other skills (plugins, your own) preserved
 ├── keywords.json            # 🔄 Updated
-└── settings.json            # 🔄 Updated (hooks config)
+├── settings.json            # 🔄 MERGED: only our 3 hooks + permissions; model/theme/other hooks preserved
+└── backups/claude-agents-*/ # 📦 Files of ours you had modified locally, moved here before updating
 ```
+
+Agents, scripts, commands and skills are installed **entry by entry** (one
+symlink or copy per file/folder), never as a whole-folder replacement.
 
 ## Quick Upgrade
 
-### If you used symlinks (default installation)
+Same command for symlink and copy installs:
 
 ```bash
-# Just pull the latest changes
 cd ~/claude-agents
 git pull
-
-# Copy new config files (if they don't exist)
-[ ! -f ~/.claude/keywords.json ] && cp ~/claude-agents/.claude/keywords.json ~/.claude/
-[ ! -f ~/.claude/settings.json ] && cp ~/claude-agents/.claude/settings.json ~/.claude/
-
-# Create pool directory
-mkdir -p ~/.claude/pool
-
-# Verify
-./scripts/claude-agents-cli.sh status
+./scripts/claude-agents-cli.sh sync     # detects the mode you installed with
+./scripts/claude-agents-cli.sh status   # also checks hooks are not duplicated
 ```
 
-### If you used --copy installation
+`sync` re-links (or re-copies) new entries, prunes entries removed upstream,
+and re-merges the hooks into `~/.claude/settings.json`.
+
+### Upgrading from a version that symlinked whole folders
+
+Older installs made `~/.claude/agents` (etc.) a symlink to the repo. Just run
+`install` again: it replaces each folder symlink with a real folder and
+per-entry links, and merges the hooks into your existing `settings.json`
+instead of overwriting it.
 
 ```bash
-# Update repo
-cd ~/claude-agents
-git pull
-
-# Sync files (preserves memory)
-./scripts/claude-agents-cli.sh sync
+./scripts/claude-agents-cli.sh install            # --symlink (default) or --copy
 ```
+
+If your `~/.claude/settings.json` has hook `timeout` values like `5000`, they
+came from an old version that assumed milliseconds; Claude Code reads them as
+**seconds**. `install`/`sync` rewrites our hooks with correct values (10/5/5).
 
 ### Manual upgrade (full control)
 
@@ -59,23 +62,20 @@ git pull
 # 2. Backup your memory (optional but recommended)
 cp ~/.claude/memory.json ~/.claude/memory.backup.json
 
-# 3. Update agents (new and updated)
-cp -r ~/claude-agents/.claude/agents/* ~/.claude/agents/
+# 3. Update agents, scripts, commands and skills (file by file, keeps your own)
+cp -r ~/claude-agents/.claude/agents/*   ~/.claude/agents/
+cp -r ~/claude-agents/.claude/scripts/*  ~/.claude/scripts/
+cp -r ~/claude-agents/.claude/commands/* ~/.claude/commands/
+cp -r ~/claude-agents/.claude/skills/*   ~/.claude/skills/
 
-# 4. Add scripts (new)
-cp -r ~/claude-agents/.claude/scripts ~/.claude/
-
-# 5. Add commands (new)
-cp -r ~/claude-agents/.claude/commands ~/.claude/
-
-# 6. Update configs
+# 4. Update keywords
 cp ~/claude-agents/.claude/keywords.json ~/.claude/
-cp ~/claude-agents/.claude/settings.json ~/.claude/
 
-# 7. Create pool directory
-mkdir -p ~/.claude/pool
+# 5. Hooks: do NOT copy .claude/settings.json over yours (it has no hooks and
+#    would drop your model/theme). Merge them with the installer instead:
+./scripts/claude-agents-cli.sh sync
 
-# 8. Verify memory is intact
+# 6. Verify memory is intact
 python3 ~/.claude/scripts/memory-manager.py stats
 ```
 
@@ -97,11 +97,19 @@ python3 ~/.claude/scripts/memory-manager.py stats
 
 # Expected output:
 # [✓] Claude home: /home/user/.claude
-# [✓] Agents: symlinked -> /home/user/claude-agents/.claude/agents
-# [✓] Scripts: symlinked
+# [✓] agents: symlinked
+# [✓] scripts: symlinked
+# [✓] commands: symlinked
+# [✓] skills: symlinked
+# [✓] context-router.py: global
+# [✓] pool-loader.py: global
+# [✓] pool-extractor.py: global
 # [✓] Keywords config: present
-# [✓] Memory: X entities, Y relations
 ```
+
+If a hook line shows `global=1 project=1 -> would run 2 times`, a project
+`.claude/settings.json` declares the same hook as your global settings: remove
+it from the project file (hooks belong in the global one).
 
 ## What's New (v2.0)
 
@@ -118,11 +126,11 @@ After upgrading, you'll have access to:
 ### Slash Commands (+8)
 - `/commit` - Generate conventional commit
 - `/pr` - Create pull request
-- `/review` - Code review
+- `/review-changes` - Code review (was `/review`, which shadowed the built-in)
 - `/test` - Generate tests
 - `/explain` - Explain code
 - `/refactor` - Refactoring suggestions
-- `/debug` - Debug errors
+- `/diagnose` - Debug errors (was `/debug`, which shadowed the built-in)
 - `/doc` - Generate documentation
 
 ### Cognitive Features

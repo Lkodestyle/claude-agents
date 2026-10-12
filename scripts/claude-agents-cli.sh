@@ -127,10 +127,13 @@ detect_python() {
 # Backwards-compatible alias used across the script.
 check_python() { detect_python; }
 
-# Generate an installed settings.json whose hook commands point at absolute
-# script paths under the install dir, using the detected Python interpreter.
-# This makes hooks resolve correctly for a GLOBAL install (any cwd) and is
-# portable across python3/python/py.
+# Merge the managed hooks (scripts/hooks.json) and the repo permissions into
+# the target settings.json WITHOUT touching anything else the user has there
+# (model, theme, autoMode, extra hooks, extra permissions...).
+#
+# Hook commands are rewritten to point at the install dir, using the detected
+# Python interpreter. Only hooks that reference one of OUR scripts are replaced;
+# hooks from other tools (e.g. the Jarvis persona hook) are preserved as-is.
 install_settings() {
     local install_dir="$1"
     # Token used to locate the hook scripts inside each hook command. It is kept
@@ -145,47 +148,154 @@ install_settings() {
     # which breaks when the same ~/.claude is shared (symlinked) between WSL and
     # native Windows.
     local hook_scripts="${2:-\$HOME/.claude/scripts}"
-    local src="$REPO_DIR/.claude/settings.json"
+    local hooks_src="$REPO_DIR/scripts/hooks.json"
+    local perms_src="$REPO_DIR/.claude/settings.json"
     local dst="$install_dir/settings.json"
 
-    if [[ ! -f "$src" ]]; then
-        log_warn "Source settings.json not found, skipping"
+    if [[ ! -f "$hooks_src" ]]; then
+        log_warn "scripts/hooks.json not found, skipping settings"
         return 0
     fi
 
-    backup_if_exists "$dst"
-
-    PYTHON_BIN="$PYTHON_BIN" HOOK_SCRIPTS="$hook_scripts" SRC="$src" DST="$dst" \
+    local result
+    result=$(PYTHON_BIN="$PYTHON_BIN" HOOK_SCRIPTS="$hook_scripts" \
+        HOOKS_SRC="$hooks_src" PERMS_SRC="$perms_src" DST="$dst" \
         $PYTHON_BIN - <<'PYEOF'
-import json, os, re
+import json, os, re, shutil, sys
+from datetime import datetime
 
 py = os.environ["PYTHON_BIN"]
 hook_scripts = os.environ["HOOK_SCRIPTS"]
-src = os.environ["SRC"]
+hooks_src = os.environ["HOOKS_SRC"]
+perms_src = os.environ["PERMS_SRC"]
 dst = os.environ["DST"]
-
-with open(src, "r", encoding="utf-8") as fh:
-    data = json.load(fh)
 
 script_re = re.compile(r"([\w.-]+\.py)")
 
-for event in data.get("hooks", {}).values():
-    for matcher in event:
-        for hook in matcher.get("hooks", []):
-            if hook.get("type") != "command":
-                continue
-            m = script_re.search(hook.get("command", ""))
-            if not m:
-                continue
-            # Forward slashes + literal token: portable across WSL and Windows.
-            script_path = f"{hook_scripts}/{m.group(1)}"
-            hook["command"] = f'{py} "{script_path}"'
 
+def load(path):
+    if not os.path.isfile(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+managed = load(hooks_src).get("hooks", {})
+managed_scripts = set()
+for groups in managed.values():
+    for group in groups:
+        for hook in group.get("hooks", []):
+            m = script_re.search(hook.get("command", ""))
+            if m:
+                managed_scripts.add(m.group(1))
+
+
+def is_managed(hook):
+    m = script_re.search(hook.get("command", ""))
+    return bool(m) and m.group(1) in managed_scripts
+
+
+def rewrite(hook):
+    m = script_re.search(hook.get("command", ""))
+    hook = dict(hook)
+    # Forward slashes + literal token: portable across WSL and Windows.
+    hook["command"] = f'{py} "{hook_scripts}/{m.group(1)}"'
+    return hook
+
+
+existing = load(dst)
+original = json.dumps(existing, sort_keys=True)
+merged = dict(existing)
+
+# --- hooks: drop every hook that references a managed script (wherever it
+# lives), then add the managed ones under their event. Everything else stays.
+hooks = {}
+for event, groups in merged.get("hooks", {}).items():
+    kept = []
+    for group in groups:
+        rest = [h for h in group.get("hooks", []) if not is_managed(h)]
+        if rest:
+            kept.append({**group, "hooks": rest})
+    if kept:
+        hooks[event] = kept
+for event, groups in managed.items():
+    for group in groups:
+        new_group = {k: v for k, v in group.items() if k != "matcher"}
+        new_group["hooks"] = [rewrite(h) for h in group.get("hooks", [])]
+        hooks.setdefault(event, []).append(new_group)
+merged["hooks"] = hooks
+
+# --- permissions: union, user's entries first.
+perms_repo = load(perms_src).get("permissions", {})
+perms = dict(merged.get("permissions", {}))
+for key in ("allow", "deny"):
+    current = list(perms.get(key, []))
+    for entry in perms_repo.get(key, []):
+        if entry not in current:
+            current.append(entry)
+    if current:
+        perms[key] = current
+if perms:
+    merged["permissions"] = perms
+
+if json.dumps(merged, sort_keys=True) == original:
+    print("unchanged")
+    sys.exit(0)
+
+if os.path.isfile(dst):
+    backup = f"{dst}.backup.{datetime.now():%Y%m%d_%H%M%S}"
+    shutil.copy2(dst, backup)
+    print(f"backup {backup}")
+
+os.makedirs(os.path.dirname(dst), exist_ok=True)
 with open(dst, "w", encoding="utf-8") as fh:
+    json.dump(merged, fh, indent=2)
+    fh.write("\n")
+print("written")
+PYEOF
+    )
+    case "$result" in
+        unchanged) log_info "Settings already up to date: $dst" ;;
+        *backup*)  log_warn "Backed up previous settings: ${result#backup }"
+                   log_info "Settings merged (hooks -> $hook_scripts): $dst" ;;
+        *)         log_info "Settings written (hooks -> $hook_scripts): $dst" ;;
+    esac
+}
+
+# Strip only OUR hooks from a settings.json (used by uninstall).
+remove_managed_hooks() {
+    local dst="$1"
+    [[ -f "$dst" ]] || return 0
+    HOOKS_SRC="$REPO_DIR/scripts/hooks.json" DST="$dst" $PYTHON_BIN - <<'PYEOF'
+import json, os, re
+
+script_re = re.compile(r"([\w.-]+\.py)")
+with open(os.environ["HOOKS_SRC"], encoding="utf-8") as fh:
+    managed = {m.group(1) for groups in json.load(fh)["hooks"].values()
+               for g in groups for h in g["hooks"]
+               for m in [script_re.search(h["command"])] if m}
+with open(os.environ["DST"], encoding="utf-8") as fh:
+    data = json.load(fh)
+hooks = {}
+for event, groups in data.get("hooks", {}).items():
+    kept = []
+    for g in groups:
+        rest = [h for h in g.get("hooks", [])
+                if not (script_re.search(h.get("command", "")) and
+                        script_re.search(h["command"]).group(1) in managed)]
+        if rest:
+            kept.append({**g, "hooks": rest})
+    if kept:
+        hooks[event] = kept
+if hooks:
+    data["hooks"] = hooks
+else:
+    data.pop("hooks", None)
+with open(os.environ["DST"], "w", encoding="utf-8") as fh:
     json.dump(data, fh, indent=2)
     fh.write("\n")
 PYEOF
-    log_info "Settings generated with portable hook paths ($hook_scripts) -> $dst"
+    log_info "Managed hooks removed from $dst"
 }
 
 check_repo() {
@@ -205,6 +315,119 @@ backup_if_exists() {
         log_step "Removing existing symlink: $target"
         rm "$target"
     fi
+}
+
+# Where user files displaced by an install go (one folder per run).
+BACKUP_ROOT="$CLAUDE_HOME/backups/claude-agents-$(date +%Y%m%d_%H%M%S)"
+
+# Install every entry of $src_dir into $dst_dir, ONE ENTRY AT A TIME, so files
+# the user keeps in the same folder (other skills, other commands, hooks from
+# other tools) survive. Entries we own are replaced; anything else is left
+# alone. A user file that would be overwritten is moved to $BACKUP_ROOT first,
+# but only if its content differs from what we are about to install.
+install_entries() {
+    local src_dir="$1" dst_dir="$2" mode="$3" kind="$4"
+
+    # Older installs symlinked the whole folder; turn it back into a real dir.
+    if [[ -L "$dst_dir" ]]; then
+        log_step "Replacing folder symlink with per-entry install: $dst_dir"
+        rm "$dst_dir"
+    fi
+    mkdir -p "$dst_dir"
+
+    local entry name target
+    for entry in "$src_dir"/*; do
+        [[ -e "$entry" ]] || continue
+        name="$(basename "$entry")"
+        [[ "$name" == "__pycache__" ]] && continue
+        target="$dst_dir/$name"
+
+        if [[ -L "$target" ]]; then
+            rm "$target"
+        elif [[ -e "$target" ]]; then
+            if ! diff -rq "$entry" "$target" > /dev/null 2>&1; then
+                mkdir -p "$BACKUP_ROOT/$kind"
+                mv "$target" "$BACKUP_ROOT/$kind/$name"
+                log_warn "Backed up modified $kind/$name -> $BACKUP_ROOT/$kind/"
+            else
+                rm -rf "$target"
+            fi
+        fi
+
+        if [[ "$mode" == "symlink" ]]; then
+            ln -s "$entry" "$target"
+        else
+            cp -r "$entry" "$target"
+        fi
+    done
+
+    # Prune symlinks that point into this repo but whose source is gone
+    # (e.g. an agent that was renamed or removed upstream).
+    for target in "$dst_dir"/*; do
+        if [[ -L "$target" && ! -e "$target" ]] && \
+           [[ "$(readlink "$target")" == "$REPO_DIR/"* ]]; then
+            rm "$target"
+            log_step "Pruned stale $kind/$(basename "$target")"
+        fi
+    done
+
+    log_info "$kind: $(ls -1 "$src_dir" | grep -vc __pycache__) entries installed (${mode}) into $dst_dir"
+}
+
+# Remove from $dst_dir only the entries that come from $src_dir.
+remove_entries() {
+    local src_dir="$1" dst_dir="$2" kind="$3"
+    [[ -d "$dst_dir" ]] || return 0
+    if [[ -L "$dst_dir" ]]; then
+        rm "$dst_dir"
+        log_info "Removed $kind folder symlink"
+        return 0
+    fi
+    local entry name
+    for entry in "$src_dir"/*; do
+        name="$(basename "$entry")"
+        [[ -e "$dst_dir/$name" || -L "$dst_dir/$name" ]] && rm -rf "$dst_dir/$name"
+    done
+    rmdir "$dst_dir" 2>/dev/null && log_info "Removed $kind" || log_info "Removed our $kind (folder kept: it still has your own files)"
+}
+
+# Router v2 kept its state next to keywords.json (global AND inside every
+# project's .claude/). v3 keeps it under ~/.claude/router/, so the old files
+# are dead weight: remove them from the install dir and the current project.
+cleanup_legacy_state() {
+    local dir f
+    for dir in "$CLAUDE_HOME" "$(pwd)/.claude"; do
+        for f in attn_state.json attention_history.jsonl; do
+            if [[ -f "$dir/$f" ]]; then
+                rm -f "$dir/$f"
+                log_step "Removed legacy router state: $dir/$f"
+            fi
+        done
+    done
+}
+
+# Install (or refresh) agents, scripts, commands and skills into $install_dir.
+install_tree() {
+    local install_dir="$1" mode="$2"
+    install_entries "$REPO_DIR/.claude/agents"   "$install_dir/agents"   "$mode" "agents"
+    install_entries "$REPO_DIR/.claude/scripts"  "$install_dir/scripts"  "$mode" "scripts"
+    install_entries "$REPO_DIR/.claude/commands" "$install_dir/commands" "$mode" "commands"
+    install_entries "$REPO_DIR/.claude/skills"   "$install_dir/skills"   "$mode" "skills"
+}
+
+# "symlinked" / "copied" / "not installed", based on the first entry we own.
+install_mode_of() {
+    local src_dir="$1" dst_dir="$2"
+    [[ -L "$dst_dir" ]] && { echo "symlinked (folder)"; return; }
+    [[ -d "$dst_dir" ]] || { echo "not installed"; return; }
+    local entry name
+    for entry in "$src_dir"/*; do
+        name="$(basename "$entry")"
+        [[ "$name" == "__pycache__" ]] && continue
+        if [[ -L "$dst_dir/$name" ]]; then echo "symlinked"; return; fi
+        if [[ -e "$dst_dir/$name" ]]; then echo "copied"; return; fi
+    done
+    echo "not installed"
 }
 
 # ============================================================================
@@ -239,64 +462,15 @@ cmd_install() {
         log_info "Installing globally: $install_dir"
     fi
 
-    # Create directories
-    mkdir -p "$install_dir"/{agents,scripts,commands,skills,pool}
-
-    # Install agents
-    log_step "Installing agents..."
-    local agents_target="$install_dir/agents"
-    backup_if_exists "$agents_target"
-
+    mkdir -p "$install_dir"
     if [[ "$mode" == "symlink" ]]; then
-        ln -s "$REPO_DIR/.claude/agents" "$agents_target"
-        log_info "Agents symlinked (auto-updates with git pull)"
+        log_info "Mode: symlink (auto-updates with git pull)"
     else
-        cp -r "$REPO_DIR/.claude/agents" "$agents_target"
-        log_info "Agents copied"
+        log_info "Mode: copy (run 'sync' after git pull)"
     fi
 
-    # Install scripts
-    log_step "Installing cognitive scripts..."
-    local scripts_target="$install_dir/scripts"
-    backup_if_exists "$scripts_target"
-
-    if [[ "$mode" == "symlink" ]]; then
-        ln -s "$REPO_DIR/.claude/scripts" "$scripts_target"
-        log_info "Scripts symlinked"
-    else
-        cp -r "$REPO_DIR/.claude/scripts" "$scripts_target"
-        log_info "Scripts copied"
-    fi
-
-    # Install commands
-    log_step "Installing slash commands..."
-    local commands_target="$install_dir/commands"
-    if [[ -d "$REPO_DIR/.claude/commands" ]]; then
-        backup_if_exists "$commands_target"
-
-        if [[ "$mode" == "symlink" ]]; then
-            ln -s "$REPO_DIR/.claude/commands" "$commands_target"
-            log_info "Commands symlinked"
-        else
-            cp -r "$REPO_DIR/.claude/commands" "$commands_target"
-            log_info "Commands copied"
-        fi
-    fi
-
-    # Install skills
-    log_step "Installing workflow skills..."
-    local skills_target="$install_dir/skills"
-    if [[ -d "$REPO_DIR/.claude/skills" ]]; then
-        backup_if_exists "$skills_target"
-
-        if [[ "$mode" == "symlink" ]]; then
-            ln -s "$REPO_DIR/.claude/skills" "$skills_target"
-            log_info "Skills symlinked"
-        else
-            cp -r "$REPO_DIR/.claude/skills" "$skills_target"
-            log_info "Skills copied"
-        fi
-    fi
+    install_tree "$install_dir" "$mode"
+    cleanup_legacy_state
 
     # Install config files
     log_step "Installing configuration files..."
@@ -314,11 +488,9 @@ cmd_install() {
         install_settings "$install_dir" '$HOME/.claude/scripts'
     fi
 
-    # Install MCP config if global
-    if [[ "$target" == "global" && ! -f "$HOME/.mcp.json" ]]; then
-        cp "$REPO_DIR/.mcp.json" "$HOME/.mcp.json"
-        log_info "MCP config installed to ~/.mcp.json"
-    fi
+    # MCP servers are per project: Claude Code reads <project>/.mcp.json, so
+    # there is nothing to install globally. Copy the repo's .mcp.json into a
+    # project yourself if you want the same servers there.
 
     # Summary
     log_header "Installation Complete!"
@@ -333,22 +505,14 @@ cmd_sync() {
     log_header "Syncing Claude Agents Configuration"
     check_repo
 
-    # Check if using symlinks (no sync needed)
-    if [[ -L "$GLOBAL_AGENTS" ]]; then
-        log_info "Agents using symlink - auto-synced via git"
-    else
-        log_step "Syncing agents..."
-        rsync -av --delete "$REPO_DIR/.claude/agents/" "$GLOBAL_AGENTS/"
-        log_info "Agents synced"
-    fi
-
-    if [[ -L "$GLOBAL_SCRIPTS" ]]; then
-        log_info "Scripts using symlink - auto-synced via git"
-    else
-        log_step "Syncing scripts..."
-        rsync -av --delete "$REPO_DIR/.claude/scripts/" "$GLOBAL_SCRIPTS/"
-        log_info "Scripts synced"
-    fi
+    # Re-run the per-entry install in whatever mode is currently in use, so a
+    # copy install picks up new/renamed/removed files and a symlink install
+    # gets any new entries linked.
+    local mode="copy"
+    [[ "$(install_mode_of "$REPO_DIR/.claude/agents" "$GLOBAL_AGENTS")" == symlinked* ]] && mode="symlink"
+    log_info "Detected install mode: $mode"
+    install_tree "$CLAUDE_HOME" "$mode"
+    cleanup_legacy_state
 
     # Always sync keywords.json (may have been updated)
     log_step "Syncing keywords.json..."
@@ -369,6 +533,7 @@ cmd_sync() {
 
 cmd_status() {
     log_header "Claude Agents Status"
+    check_python
 
     # Check installation
     echo -e "${BOLD}Installation:${NC}"
@@ -378,21 +543,31 @@ cmd_status() {
         log_error "Claude home not found: $CLAUDE_HOME"
     fi
 
-    if [[ -L "$GLOBAL_AGENTS" ]]; then
-        log_info "Agents: symlinked -> $(readlink "$GLOBAL_AGENTS")"
-    elif [[ -d "$GLOBAL_AGENTS" ]]; then
-        log_info "Agents: copied"
-    else
-        log_error "Agents: not installed"
-    fi
+    local kind state
+    for kind in agents scripts commands skills; do
+        state="$(install_mode_of "$REPO_DIR/.claude/$kind" "$CLAUDE_HOME/$kind")"
+        case "$state" in
+            "not installed") log_warn "$kind: $state" ;;
+            *) log_info "$kind: $state" ;;
+        esac
+    done
 
-    if [[ -L "$GLOBAL_SCRIPTS" ]]; then
-        log_info "Scripts: symlinked -> $(readlink "$GLOBAL_SCRIPTS")"
-    elif [[ -d "$GLOBAL_SCRIPTS" ]]; then
-        log_info "Scripts: copied"
-    else
-        log_warn "Scripts: not installed"
-    fi
+    # Hooks: ours should appear exactly once, and only in the global settings.
+    echo ""
+    echo -e "${BOLD}Hooks:${NC}"
+    local project_settings="$(pwd)/.claude/settings.json"
+    for script in context-router.py pool-loader.py pool-extractor.py; do
+        local n_global=0 n_project=0
+        [[ -f "$CLAUDE_HOME/settings.json" ]] && n_global=$(grep -c "$script" "$CLAUDE_HOME/settings.json" || true)
+        [[ -f "$project_settings" && "$project_settings" != "$CLAUDE_HOME/settings.json" ]] && n_project=$(grep -c "$script" "$project_settings" || true)
+        if [[ $n_global -eq 1 && $n_project -eq 0 ]]; then
+            log_info "$script: global"
+        elif [[ $n_global -eq 0 && $n_project -eq 0 ]]; then
+            log_warn "$script: not configured (run install)"
+        else
+            log_error "$script: global=$n_global project=$n_project -> would run $((n_global + n_project)) times per event"
+        fi
+    done
 
     # List agents
     echo ""
@@ -422,7 +597,7 @@ cmd_status() {
     # List skills
     echo ""
     if [[ -d "$GLOBAL_SKILLS" ]]; then
-        local skill_count=$(find "$GLOBAL_SKILLS" -name "SKILL.md" 2>/dev/null | wc -l)
+        local skill_count=$(ls -1d "$GLOBAL_SKILLS"/*/SKILL.md 2>/dev/null | wc -l)
         echo -e "${BOLD}Installed Skills ($skill_count):${NC}"
         for skill_dir in "$GLOBAL_SKILLS"/*/; do
             if [[ -f "${skill_dir}SKILL.md" ]]; then
@@ -442,30 +617,30 @@ cmd_status() {
         log_warn "Keywords config: missing"
     fi
 
-    if [[ -f "$CLAUDE_HOME/attn_state.json" ]]; then
-        local turn_count=$(python3 -c "import json; print(json.load(open('$CLAUDE_HOME/attn_state.json')).get('turn_count', 0))" 2>/dev/null || echo "?")
-        log_info "Attention state: $turn_count turns tracked"
+    if [[ -d "$CLAUDE_HOME/router" ]]; then
+        local projects=$(ls -1 "$CLAUDE_HOME/router"/*.json 2>/dev/null | wc -l)
+        log_info "Router state: $projects project(s) tracked in $CLAUDE_HOME/router/"
     else
-        log_warn "Attention state: not initialized"
+        log_warn "Router state: not initialized (runs on first prompt)"
     fi
 
-    if [[ -f "$CLAUDE_HOME/pool/instance_state.jsonl" ]]; then
-        local pool_count=$(wc -l < "$CLAUDE_HOME/pool/instance_state.jsonl" 2>/dev/null || echo "0")
-        log_info "Pool entries: $pool_count"
+    if [[ -n "${CLAUDE_INSTANCE:-}" ]]; then
+        local pool_count=$(cat "$CLAUDE_HOME/pool/instance_state.jsonl" "$(pwd)/.claude/pool/instance_state.jsonl" 2>/dev/null | wc -l)
+        log_info "Pool coordinator: ON (instance $CLAUDE_INSTANCE, $pool_count entries)"
     else
-        log_warn "Pool: not initialized"
+        log_info "Pool coordinator: off (opt-in: export CLAUDE_INSTANCE=A)"
     fi
 
     # MCP servers
     echo ""
     echo -e "${BOLD}MCP Configuration:${NC}"
 
-    if [[ -f "$HOME/.mcp.json" ]]; then
-        log_info "MCP config: ~/.mcp.json"
-        local servers=$(python3 -c "import json; print(len(json.load(open('$HOME/.mcp.json')).get('mcpServers', {})))" 2>/dev/null || echo "?")
-        log_info "MCP servers configured: $servers"
+    local mcp_file="$(pwd)/.mcp.json"
+    if [[ -f "$mcp_file" ]]; then
+        local servers=$($PYTHON_BIN -c "import json; print(', '.join(json.load(open('$mcp_file')).get('mcpServers', {})))" 2>/dev/null || echo "?")
+        log_info "Project .mcp.json: $servers"
     else
-        log_warn "MCP config: not found"
+        log_info "No .mcp.json in $(pwd) (MCP servers are configured per project)"
     fi
 
     # Environment
@@ -514,7 +689,7 @@ cmd_test() {
 
     # Test pool loader
     log_step "Testing pool loader..."
-    if $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
+    if echo '{}' | CLAUDE_INSTANCE=test $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
         log_info "Pool loader: OK"
     else
         log_error "Pool loader: FAILED"
@@ -664,29 +839,16 @@ cmd_proxy() {
 cmd_uninstall() {
     log_header "Uninstalling Claude Agents"
 
-    if [[ -e "$GLOBAL_AGENTS" ]]; then
-        rm -rf "$GLOBAL_AGENTS"
-        log_info "Removed agents"
-    fi
-
-    if [[ -e "$GLOBAL_SCRIPTS" ]]; then
-        rm -rf "$GLOBAL_SCRIPTS"
-        log_info "Removed scripts"
-    fi
-
-    if [[ -e "$GLOBAL_COMMANDS" ]]; then
-        rm -rf "$GLOBAL_COMMANDS"
-        log_info "Removed commands"
-    fi
-
-    if [[ -e "$GLOBAL_SKILLS" ]]; then
-        rm -rf "$GLOBAL_SKILLS"
-        log_info "Removed skills"
-    fi
+    check_python
+    remove_entries "$REPO_DIR/.claude/agents"   "$GLOBAL_AGENTS"   "agents"
+    remove_entries "$REPO_DIR/.claude/scripts"  "$GLOBAL_SCRIPTS"  "scripts"
+    remove_entries "$REPO_DIR/.claude/commands" "$GLOBAL_COMMANDS" "commands"
+    remove_entries "$REPO_DIR/.claude/skills"   "$GLOBAL_SKILLS"   "skills"
+    remove_managed_hooks "$CLAUDE_HOME/settings.json"
 
     # Keep config files by default
-    log_warn "Config files preserved (keywords.json, settings.json)"
-    log_info "Delete manually if needed: rm $CLAUDE_HOME/*.json"
+    log_warn "Preserved: keywords.json, permissions and any non-managed settings"
+    log_info "Delete manually if needed: rm $CLAUDE_HOME/keywords.json"
 
     log_header "Uninstall Complete"
 }

@@ -30,13 +30,36 @@ Antes de responder cualquier pregunta o realizar cualquier tarea, evalua si algu
 
 ### Como Invocar Agentes
 
-Usa el Task tool con `subagent_type` para invocar el agente apropiado:
+Usa el tool `Agent` con `subagent_type` para delegar en el agente apropiado:
 
 ```
-Task(subagent_type="mobile", prompt="Ayuda con...", description="Mobile dev task")
-Task(subagent_type="web", prompt="Implementa...", description="Web dev task")
-Task(subagent_type="terraform", prompt="Crea...", description="IaC task")
+Agent(subagent_type="mobile", prompt="Ayuda con...", description="Mobile dev task")
+Agent(subagent_type="web", prompt="Implementa...", description="Web dev task")
+Agent(subagent_type="terraform", prompt="Crea...", description="IaC task")
 ```
+
+### Trabajo en Paralelo (orquestacion)
+
+La instancia principal es la que reparte trabajo. Reglas:
+
+- **Independiente → en paralelo.** Si dos tareas no dependen una de otra, lanza los
+  `Agent` en el MISMO mensaje (varios tool calls juntos): corren concurrentemente y
+  seguis trabajando mientras tanto; los reportes llegan como notificacion.
+- **Dependiente → secuencial.** Si B necesita el resultado de A, espera A.
+- **`subagent_type="fork"`** cuando el agente necesita TODO tu contexto actual (misma
+  conversacion, mismo modelo). Agente especializado (`terraform`, `web`...) cuando lo que
+  importa es su prompt experto y un contexto limpio.
+- **`isolation="worktree"`** cuando dos agentes van a EDITAR el mismo repo a la vez: cada
+  uno trabaja en su propio git worktree y no se pisan.
+- **Investigar vs. editar.** Para auditorias, busquedas amplias o comparar archivos, pedi
+  un reporte (el agente lee, vos decidis). Para implementar, dale una tarea cerrada y
+  verificable (tests, `terraform plan`, lint).
+- **`Workflow`** para orquestaciones grandes (pipeline review → verify, fan-out de N
+  agentes): solo si el usuario lo pide ("use a workflow" / "ultracode").
+- Nunca hagas vos mismo lo que ya delegaste; espera el resultado y relata lo que importa.
+
+Ejemplo: "auditar el repo" → 2 `Agent(programming)` en paralelo (contenido e instalador),
+mientras la instancia principal prueba el router a mano. Ver `agents-hub` para el detalle.
 
 ### Ejemplo de Uso Automatico
 
@@ -78,22 +101,28 @@ Este repositorio incluye funcionalidades cognitivas avanzadas inspiradas en [cla
 
 ### Context Router
 
-Activacion inteligente de agentes basada en keywords:
+Sugerencia de agentes basada en keywords, en UNA linea por prompt:
 
-- **HOT** (score > 0.8): Inyeccion completa del agente
-- **WARM** (score 0.25-0.8): Solo headers del agente
-- **COLD** (score < 0.25): Agente no inyectado
+```
+[context-router] Suggested agents: terraform, aws · related: networking · skill: infrastructure-as-code
+```
 
-Caracteristicas:
-- Activacion por palabras clave (configurado en `keywords.json`)
-- Co-activacion de agentes relacionados
-- Decay gradual de agentes no mencionados
-- Archivos fijados (pinned) que siempre estan disponibles
+- **HOT** (score >= 0.8): aparece en `Suggested agents` → delegar a ese agente
+- **WARM** (score 0.25-0.8): aparece en `related` → tenerlo en cuenta
+- **COLD** (score < 0.25): no aparece
+
+No inyecta el contenido de los agentes (cada subagente ya recibe su propio prompt al
+invocarlo). Config en `~/.claude/keywords.json` (keywords en ingles y espanol, sin
+acentos), estado en `~/.claude/router/<proyecto>.json`, historial opt-in. `"output": "full"`
+restaura la inyeccion de contenido de la v2.
 
 ### Pool Coordinator
 
-Coordinacion entre multiples instancias de Claude Code:
+Coordinacion entre multiples **terminales** de Claude Code abiertas a la vez (vos con dos
+sesiones, o un equipo). NO es lo que lanza agentes en paralelo: eso es el tool `Agent`
+(ver "Trabajo en Paralelo").
 
+- **Opt-in:** los hooks salen al instante si `CLAUDE_INSTANCE` no esta definida
 - Comparte estado entre instancias (A, B, C, etc.) via `.claude/pool/instance_state.jsonl`
 - Evita trabajo duplicado en equipos
 - El hook `SessionStart` inyecta la actividad reciente de otras instancias al contexto
@@ -172,11 +201,14 @@ Este repositorio incluye **8 comandos** listos para usar (Jarvis, el asistente p
 |---------|-------------|-----|
 | `/commit` | Genera commit message con Conventional Commits | `git add . && /commit` |
 | `/pr` | Crea PR con descripcion auto-generada | `/pr` |
-| `/review` | Code review de cambios staged o archivos | `/review` o `/review src/file.ts` |
+| `/review-changes` | Code review de cambios staged o archivos | `/review-changes` o `/review-changes src/file.ts` |
 | `/test` | Genera unit tests para codigo | `/test src/utils.ts` |
 | `/explain` | Explica como funciona el codigo | `/explain src/auth/` |
 | `/refactor` | Sugiere y aplica refactoring | `/refactor src/legacy.ts` |
-| `/debug` | Ayuda a debuggear errores | `/debug "TypeError: cannot read..."` |
+| `/diagnose` | Ayuda a debuggear errores | `/diagnose "TypeError: cannot read..."` |
+
+`/review-changes` y `/diagnose` se llamaban `/review` y `/debug`; se renombraron porque
+pisaban los comandos nativos de Claude Code del mismo nombre.
 | `/doc` | Genera documentacion (README, JSDoc, docstrings) | `/doc src/api/` |
 
 ### Ejemplos de Uso
@@ -190,7 +222,7 @@ git add .
 /pr
 
 # Review de codigo
-/review
+/review-changes
 
 # Generar tests
 /test src/services/auth.ts
@@ -202,7 +234,7 @@ git add .
 /refactor src/old-module.js
 
 # Debuggear un error
-/debug "Cannot read property 'map' of undefined"
+/diagnose "Cannot read property 'map' of undefined"
 
 # Generar documentacion
 /doc src/api/
@@ -411,11 +443,11 @@ claude-agents/
 │   ├── commands/             # Slash Commands
 │   │   ├── commit.md         # /commit - Conventional commits
 │   │   ├── pr.md             # /pr - Create pull request
-│   │   ├── review.md         # /review - Code review
+│   │   ├── review-changes.md # /review-changes - Code review
 │   │   ├── test.md           # /test - Generate tests
 │   │   ├── explain.md        # /explain - Explain code
 │   │   ├── refactor.md       # /refactor - Suggest refactoring
-│   │   ├── debug.md          # /debug - Debug errors
+│   │   ├── diagnose.md       # /diagnose - Debug errors
 │   │   └── doc.md            # /doc - Generate docs
 │   ├── skills/               # Skills (guia + workflows)
 │   │   ├── agents-hub/       # Guia de routing de agentes (entry point)
@@ -434,11 +466,10 @@ claude-agents/
 │   ├── keywords.json         # Config de palabras clave
 │   └── settings.json         # Config de hooks
 ├── scripts/
-│   ├── install.sh            # Instalador legacy
 │   ├── claude-agents-cli.sh  # CLI completo (v3)
 │   ├── setup-mcp.sh          # Setup de MCP servers
 │   └── setup-obsidian.sh     # Setup de Obsidian vault MCP
-└── templates/                # Templates reutilizables
+└── templates/                # Guias de referencia (README por tipo: ecs, gh-workflow, gitlab-ci, tf-module)
 ```
 
 ## Hooks de Claude Code
@@ -447,7 +478,10 @@ Los hooks permiten ejecutar comandos automaticamente en diferentes momentos del 
 
 ### Hooks Cognitivos Incluidos
 
-Este repositorio configura automaticamente los siguientes hooks en `.claude/settings.json`:
+Los hooks se definen una sola vez en `scripts/hooks.json` y el instalador los
+**mergea** en tu `~/.claude/settings.json` global (sin pisar model, theme ni hooks
+de otras herramientas). El `.claude/settings.json` del repo NO declara hooks a
+proposito: si proyecto y global tienen el mismo hook, corre dos veces por evento.
 
 | Hook | Script | Funcion |
 |------|--------|---------|
@@ -496,13 +530,18 @@ depender del directorio actual:
 hooks de tools (`PreToolUse`/`PostToolUse`); en eventos como `UserPromptSubmit`, `Stop` o
 `SessionStart` se omite.
 
-Para una instalacion **global**, el instalador (`claude-agents-cli.sh install`) genera el
-`~/.claude/settings.json` con **rutas absolutas** al directorio de scripts y el binario de
-Python detectado (`python3`/`python`/`py -3`), por ejemplo:
+Para la instalacion **global**, el instalador (`claude-agents-cli.sh install`) escribe los
+hooks con la forma portable `$HOME/.claude/scripts/<script>.py` y el binario de Python
+detectado (`python3`/`python`/`py -3`), por ejemplo:
 
 ```json
-"command": "python3 \"/home/usuario/.claude/scripts/context-router.py\""
+"command": "python3 \"$HOME/.claude/scripts/context-router.py\""
 ```
+
+Agentes, scripts, commands y skills se instalan **entrada por entrada** (un symlink o
+copia por archivo/carpeta), asi que conviven con skills de plugins o commands propios que
+tengas en `~/.claude`. `claude-agents-cli.sh status` muestra el modo de instalacion y cuantas
+veces correria cada hook.
 
 ### Ejemplos Utiles
 
