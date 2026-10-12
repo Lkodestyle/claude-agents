@@ -488,11 +488,9 @@ cmd_install() {
         install_settings "$install_dir" '$HOME/.claude/scripts'
     fi
 
-    # Install MCP config if global
-    if [[ "$target" == "global" && ! -f "$HOME/.mcp.json" ]]; then
-        cp "$REPO_DIR/.mcp.json" "$HOME/.mcp.json"
-        log_info "MCP config installed to ~/.mcp.json"
-    fi
+    # MCP servers are per project: Claude Code reads <project>/.mcp.json, so
+    # there is nothing to install globally. Copy the repo's .mcp.json into a
+    # project yourself if you want the same servers there.
 
     # Summary
     log_header "Installation Complete!"
@@ -626,23 +624,23 @@ cmd_status() {
         log_warn "Router state: not initialized (runs on first prompt)"
     fi
 
-    if [[ -f "$CLAUDE_HOME/pool/instance_state.jsonl" ]]; then
-        local pool_count=$(wc -l < "$CLAUDE_HOME/pool/instance_state.jsonl" 2>/dev/null || echo "0")
-        log_info "Pool entries: $pool_count"
+    if [[ -n "${CLAUDE_INSTANCE:-}" ]]; then
+        local pool_count=$(cat "$CLAUDE_HOME/pool/instance_state.jsonl" "$(pwd)/.claude/pool/instance_state.jsonl" 2>/dev/null | wc -l)
+        log_info "Pool coordinator: ON (instance $CLAUDE_INSTANCE, $pool_count entries)"
     else
-        log_warn "Pool: not initialized"
+        log_info "Pool coordinator: off (opt-in: export CLAUDE_INSTANCE=A)"
     fi
 
     # MCP servers
     echo ""
     echo -e "${BOLD}MCP Configuration:${NC}"
 
-    if [[ -f "$HOME/.mcp.json" ]]; then
-        log_info "MCP config: ~/.mcp.json"
-        local servers=$($PYTHON_BIN -c "import json; print(len(json.load(open('$HOME/.mcp.json')).get('mcpServers', {})))" 2>/dev/null || echo "?")
-        log_info "MCP servers configured: $servers"
+    local mcp_file="$(pwd)/.mcp.json"
+    if [[ -f "$mcp_file" ]]; then
+        local servers=$($PYTHON_BIN -c "import json; print(', '.join(json.load(open('$mcp_file')).get('mcpServers', {})))" 2>/dev/null || echo "?")
+        log_info "Project .mcp.json: $servers"
     else
-        log_warn "MCP config: not found"
+        log_info "No .mcp.json in $(pwd) (MCP servers are configured per project)"
     fi
 
     # Environment
@@ -691,7 +689,7 @@ cmd_test() {
 
     # Test pool loader
     log_step "Testing pool loader..."
-    if $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
+    if echo '{}' | CLAUDE_INSTANCE=test $PYTHON_BIN "$GLOBAL_SCRIPTS/pool-loader.py" > /dev/null 2>&1; then
         log_info "Pool loader: OK"
     else
         log_error "Pool loader: FAILED"

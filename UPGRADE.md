@@ -7,7 +7,7 @@ How to update your Claude Agents installation without losing your existing memor
 ```
 ~/.claude/
 ├── memory.json              # ✅ YOUR MEMORY - NEVER TOUCHED
-├── attn_state.json          # ✅ Your attention state - preserved
+├── router/                  # ✅ Router state per project - preserved
 ├── attention_history.jsonl  # ✅ Your history - preserved
 ├── pool/                    # ✅ Your pool state - preserved
 ├── settings.local.json      # ✅ Your local settings - preserved
@@ -126,11 +126,11 @@ After upgrading, you'll have access to:
 ### Slash Commands (+8)
 - `/commit` - Generate conventional commit
 - `/pr` - Create pull request
-- `/review` - Code review
+- `/review-changes` - Code review (was `/review`, which shadowed the built-in)
 - `/test` - Generate tests
 - `/explain` - Explain code
 - `/refactor` - Refactoring suggestions
-- `/debug` - Debug errors
+- `/diagnose` - Debug errors (was `/debug`, which shadowed the built-in)
 - `/doc` - Generate documentation
 
 ### Cognitive Features

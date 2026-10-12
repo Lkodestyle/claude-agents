@@ -5,7 +5,7 @@ A comprehensive collection of specialized AI agents for Claude Code, focused on 
 ## Features
 
 - **15 Specialized Agents** - DevOps, Cloud, IaC, and development expertise
-- **8 Slash Commands** - `/commit`, `/pr`, `/review`, `/test`, `/explain`, `/refactor`, `/debug`, `/doc`
+- **8 Slash Commands** - `/commit`, `/pr`, `/review-changes`, `/test`, `/explain`, `/refactor`, `/diagnose`, `/doc`
 - **Cognitive Context Router** - Intelligent agent activation based on conversation keywords
 - **Pool Coordinator** - Multi-instance coordination for teams
 - **Memory Manager** - MCP memory management utilities
@@ -60,11 +60,11 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 |---------|-------------|---------|
 | `/commit` | Generate conventional commit message | `git add . && /commit` |
 | `/pr` | Create PR with auto-generated description | `/pr` |
-| `/review` | Code review staged changes or files | `/review` or `/review src/file.ts` |
+| `/review-changes` | Code review staged changes or files | `/review-changes` or `/review-changes src/file.ts` |
 | `/test` | Generate unit tests for code | `/test src/utils.ts` |
 | `/explain` | Explain how code works | `/explain src/auth/` |
 | `/refactor` | Suggest and apply refactoring | `/refactor src/legacy.ts` |
-| `/debug` | Help debug errors | `/debug "TypeError: cannot read..."` |
+| `/diagnose` | Help debug errors | `/diagnose "TypeError: cannot read..."` |
 | `/doc` | Generate documentation | `/doc src/api/` |
 
 ## Skills
@@ -75,7 +75,7 @@ Installed automatically with `claude-agents-cli.sh install` into `~/.claude/skil
 
 | Skill | Purpose |
 |-------|---------|
-| `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains proactive invocation via the Task tool. Use it at the start of any technical task. |
+| `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains how to fan work out to agents with the Agent tool. Use it at the start of any technical task. |
 
 ### Workflow Skills
 
@@ -195,7 +195,10 @@ fire on unrelated prompts and were removed in v3.
 
 ### Pool Coordinator
 
-Coordinate work across multiple Claude Code instances:
+Coordinate work across multiple Claude Code **terminals** open at the same time
+(you with two sessions, or a team). It is **opt-in**: the hooks exit immediately
+unless `CLAUDE_INSTANCE` is set. Note this is not what runs agents in parallel —
+that is the native `Agent` tool (see the `agents-hub` skill).
 
 ```bash
 # Terminal 1
@@ -432,12 +435,12 @@ claude-agents/
 │   │   └── web.md
 │   ├── commands/             # Slash commands
 │   │   ├── commit.md
-│   │   ├── debug.md
+│   │   ├── diagnose.md
 │   │   ├── doc.md
 │   │   ├── explain.md
 │   │   ├── pr.md
 │   │   ├── refactor.md
-│   │   ├── review.md
+│   │   ├── review-changes.md
 │   │   └── test.md
 │   ├── skills/               # Skills (routing guide + workflows)
 │   │   ├── agents-hub/           # Agent routing guide (entry point)
@@ -457,7 +460,7 @@ claude-agents/
 ├── scripts/
 │   ├── setup.sh              # Full onboarding (runs all setup steps)
 │   └── claude-agents-cli.sh  # CLI installer
-└── templates/                # Reusable templates
+└── templates/                # Reference guides (one README per type: ecs, gh-workflow, gitlab-ci, tf-module)
     ├── ecs-service/
     ├── github-workflow/
     ├── gitlab-ci/
