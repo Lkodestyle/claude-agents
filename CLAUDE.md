@@ -75,7 +75,9 @@ Si el usuario dice: "Estoy creando un MVP de una app mobile con React Native"
 
 ## Agentes Disponibles
 
-Este repositorio contiene **15 subagentes especializados** que Claude Code usara automaticamente segun el contexto:
+Este repositorio contiene **15 subagentes especializados** que Claude Code usara automaticamente segun el contexto.
+Modelo: `architecture` y `security` corren con `opus` (razonamiento, poco volumen); el resto con `sonnet`
+(generacion de codigo/config, donde el costo por token pesa mas).
 
 | Agente | Especialidad |
 |--------|--------------|

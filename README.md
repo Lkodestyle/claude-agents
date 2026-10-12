@@ -36,6 +36,8 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 
 ## Agents
 
+`architecture` and `security` run on `opus` (reasoning-heavy, low volume); the other 13 on `sonnet`.
+
 | Agent | Specialty | Keywords |
 |-------|-----------|----------|
 | `architecture` | System design, C4 diagrams, ADRs, trade-offs | architecture, design, microservices, scalability |
