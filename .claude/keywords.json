@@ -1,106 +1,121 @@
 {
-  "description": "Keywords configuration for intelligent agent activation (inspired by claude-cognitive)",
-  "version": "1.0.0",
+  "description": "Keywords configuration for the context router (v3). Keywords are matched as whole words, case- and accent-insensitive. Avoid generic words (plan, app, test, state...) : they fire on unrelated prompts.",
+  "version": "3.0.0",
+
+  "output": "compact",
+  "history": false,
 
   "keywords": {
     "agents/terraform.md": [
-      "terraform", "hcl", "tfvars", "state", "plan", "apply", "destroy",
-      "terraspace", "terragrunt", "module", "provider", "backend",
-      "infrastructure as code", "iac"
+      "terraform", "hcl", "tfvars", "tfstate", "terraspace", "terragrunt",
+      "infrastructure as code", "iac", "terraform plan", "terraform apply",
+      "modulo terraform", "terraform module"
     ],
     "agents/aws.md": [
-      "aws", "amazon", "ec2", "ecs", "eks", "lambda", "s3", "rds",
-      "dynamodb", "cloudwatch", "iam", "vpc", "cloudformation", "cdk",
-      "api gateway", "sqs", "sns", "eventbridge", "fargate", "ecr"
+      "aws", "ec2", "ecs", "eks", "lambda", "s3", "rds", "dynamodb",
+      "cloudwatch", "cloudformation", "cdk", "api gateway", "sqs", "sns",
+      "eventbridge", "fargate", "ecr", "route53", "cloudfront"
     ],
     "agents/azure.md": [
-      "azure", "microsoft", "app service", "aks", "azure functions",
-      "cosmos db", "blob storage", "vnet", "key vault", "arm template",
-      "bicep", "azure devops", "entra", "active directory"
+      "azure", "app service", "aks", "azure functions", "cosmos db",
+      "blob storage", "vnet", "key vault", "arm template", "bicep",
+      "azure devops", "entra"
     ],
     "agents/kubernetes.md": [
-      "kubernetes", "k8s", "kubectl", "helm", "kustomize", "pod", "deployment",
-      "service", "ingress", "configmap", "secret", "statefulset", "daemonset",
-      "namespace", "pvc", "hpa", "operator", "crd", "istio", "argocd"
+      "kubernetes", "k8s", "kubectl", "helm", "kustomize", "pod", "pods",
+      "ingress", "configmap", "statefulset", "daemonset", "namespace",
+      "pvc", "hpa", "operator", "crd", "istio", "argocd", "cluster"
     ],
     "agents/docker.md": [
-      "docker", "dockerfile", "container", "image", "compose", "buildx",
-      "multi-stage", "registry", "ecr", "gcr", "dockerhub", "containerd",
-      "podman", "distroless"
+      "docker", "dockerfile", "container", "containers", "contenedor",
+      "contenedores", "docker compose", "compose", "buildx", "multi-stage",
+      "containerd", "podman", "distroless", "imagen docker", "docker image"
     ],
     "agents/cicd.md": [
-      "cicd", "ci/cd", "pipeline", "github actions", "gitlab ci", "jenkins",
-      "workflow", "deploy", "release", "artifact", "build", "test",
-      "blue green", "canary", "rollback", "argocd", "flux"
+      "cicd", "ci/cd", "pipeline", "pipelines", "github actions", "gitlab ci",
+      "jenkins", "deploy", "deployment", "despliegue", "desplegar", "release",
+      "blue green", "canary", "rollback", "flux"
     ],
     "agents/databases.md": [
-      "database", "postgresql", "postgres", "mysql", "dynamodb", "redis",
-      "mongodb", " sql", "query", "index", "migration", "schema", " orm ",
-      "sqlalchemy", "prisma", "backup", "replication", "typeorm", "sequelize"
+      "database", "base de datos", "postgresql", "postgres", "mysql",
+      "dynamodb", "redis", "mongodb", "sql", "migration", "migracion",
+      "migraciones", "schema", "esquema", "orm", "sqlalchemy", "prisma",
+      "typeorm", "sequelize", "indice", "indices", "tabla", "tablas"
     ],
     "agents/monitoring.md": [
-      "monitoring", "prometheus", "grafana", "cloudwatch", "datadog",
-      "alert", "metric", "dashboard", "slo", "sli", "observability",
-      "logging", "tracing", "apm", "elk", "loki", "jaeger"
+      "monitoring", "monitoreo", "prometheus", "grafana", "cloudwatch",
+      "datadog", "alert", "alerts", "alerta", "alertas", "metric", "metrics",
+      "metricas", "dashboard", "slo", "sli", "observability", "observabilidad",
+      "logging", "logs", "tracing", "apm", "elk", "loki", "jaeger"
     ],
     "agents/networking.md": [
-      "network", "vpc", "vnet", "subnet", "cidr", "security group",
-      "nacl", "load balancer", "alb", "nlb", "dns", "route53",
-      "vpn", "peering", "transit gateway", "firewall"
+      "network", "networking", "vpc", "vnet", "subnet", "subnets", "cidr",
+      "security group", "nacl", "load balancer", "alb", "nlb", "dns",
+      "route53", "vpn", "peering", "transit gateway", "firewall", "redes"
     ],
     "agents/architecture.md": [
-      "architecture", "design", "microservices", "monolith", "event driven",
-      "cqrs", "saga", "ddd", "c4", "adr", "trade-off", "scalability",
-      "availability", "resilience", "well-architected"
+      "architecture", "arquitectura", "microservices", "microservicios",
+      "monolith", "monolito", "event driven", "cqrs", "saga", "ddd", "c4",
+      "adr", "trade-off", "trade-offs", "scalability", "escalabilidad",
+      "well-architected", "system design", "diseño de sistema"
     ],
     "agents/programming.md": [
-      "code review", "refactor", "clean code", "solid", "design pattern",
-      "repository pattern", "factory", "test", "unit test", "tdd",
-      "api design", "rest", "graphql"
+      "code review", "refactor", "refactoring", "refactorizar", "clean code",
+      "solid", "design pattern", "patron de diseño", "repository pattern",
+      "unit test", "unit tests", "tests unitarios", "pruebas unitarias", "tdd",
+      "api design", "graphql", "typing", "linter"
     ],
     "agents/web.md": [
-      "react", "next.js", "vue", "nuxt", "typescript", "node.js", "express",
-      "fastapi", "django", "flask", "frontend", "backend", "fullstack",
-      "nginx", "vercel", "netlify", "web app", "website", "webapp"
+      "react", "next.js", "nextjs", "vue", "nuxt", "typescript", "node.js",
+      "nodejs", "express", "fastapi", "django", "flask", "frontend", "backend",
+      "fullstack", "nginx", "vercel", "netlify", "web app", "website", "webapp",
+      "api rest", "rest api", "endpoint", "endpoints"
     ],
     "agents/mobile.md": [
-      "mobile", "app", "react native", "expo", "flutter", "ios", "android",
-      "swift", "kotlin", "mvp", "aplicacion", "smartphone", "tablet",
-      "play store", "app store", "push notification", "deep link",
-      "nativo", "hibrido", "capacitor", "ionic"
+      "mobile", "movil", "app movil", "aplicacion movil", "react native",
+      "expo", "flutter", "ios", "android", "swift", "kotlin", "smartphone",
+      "tablet", "play store", "app store", "push notification", "deep link",
+      "capacitor", "ionic"
     ],
     "agents/finops.md": [
-      "cost", "finops", "billing", "budget", "optimization", "rightsizing",
-      "reserved instance", "savings plan", "spot instance", "cost explorer",
-      "tagging", "chargeback"
+      "cost", "costs", "costo", "costos", "finops", "billing", "facturacion",
+      "budget", "presupuesto", "rightsizing", "reserved instance",
+      "savings plan", "spot instance", "cost explorer", "chargeback"
     ],
     "agents/security.md": [
-      "security", "vulnerability", "cve", "owasp", "secret", "credential",
-      "iam", "permission", "audit", "compliance", "encryption", "waf",
-      "penetration", "scan", "trivy", "snyk", "gitleaks"
+      "security", "seguridad", "vulnerability", "vulnerabilities",
+      "vulnerabilidad", "vulnerabilidades", "cve", "owasp", "secrets",
+      "credentials", "credenciales", "iam", "compliance", "encryption",
+      "cifrado", "waf", "pentest", "trivy", "snyk", "gitleaks", "hardening"
     ]
   },
 
   "co_activation": {
     "agents/terraform.md": ["agents/aws.md", "agents/azure.md", "agents/networking.md"],
-    "agents/aws.md": ["agents/terraform.md", "agents/networking.md", "agents/finops.md"],
-    "agents/azure.md": ["agents/terraform.md", "agents/networking.md", "agents/finops.md"],
-    "agents/kubernetes.md": ["agents/docker.md", "agents/monitoring.md", "agents/networking.md"],
-    "agents/docker.md": ["agents/kubernetes.md", "agents/cicd.md"],
-    "agents/cicd.md": ["agents/docker.md", "agents/terraform.md"],
-    "agents/databases.md": ["agents/programming.md", "agents/monitoring.md"],
-    "agents/monitoring.md": ["agents/kubernetes.md", "agents/aws.md"],
-    "agents/architecture.md": ["agents/programming.md", "agents/databases.md"],
-    "agents/security.md": ["agents/cicd.md", "agents/docker.md", "agents/aws.md"],
-    "agents/mobile.md": ["agents/web.md", "agents/programming.md", "agents/databases.md"]
+    "agents/aws.md": ["agents/terraform.md", "agents/networking.md"],
+    "agents/azure.md": ["agents/terraform.md", "agents/networking.md"],
+    "agents/kubernetes.md": ["agents/docker.md", "agents/monitoring.md"],
+    "agents/docker.md": ["agents/cicd.md"],
+    "agents/cicd.md": ["agents/docker.md"],
+    "agents/databases.md": ["agents/programming.md"],
+    "agents/monitoring.md": ["agents/kubernetes.md"],
+    "agents/security.md": ["agents/cicd.md", "agents/docker.md"],
+    "agents/mobile.md": ["agents/web.md"]
   },
 
-  "pinned": [
-    "agents/architecture.md"
-  ],
+  "_skills_rule": "first agent is the anchor: it must be HOT together with at least one more of the list",
+  "skills": {
+    "deploy-pipeline": ["cicd", "docker", "aws", "azure"],
+    "observability-setup": ["monitoring", "kubernetes", "aws", "azure"],
+    "infrastructure-as-code": ["terraform", "networking", "aws", "azure"],
+    "security-hardening": ["security", "docker", "cicd"],
+    "full-stack-scaffold": ["web", "mobile", "databases", "architecture"]
+  },
+
+  "pinned": [],
 
   "decay_rates": {
-    "agents/architecture.md": 0.90,
+    "agents/architecture.md": 0.80,
     "agents/terraform.md": 0.80,
     "agents/aws.md": 0.80,
     "agents/azure.md": 0.80,
@@ -113,15 +128,15 @@
     "agents/programming.md": 0.70,
     "agents/web.md": 0.70,
     "agents/mobile.md": 0.75,
-    "agents/finops.md": 0.85,
+    "agents/finops.md": 0.80,
     "agents/security.md": 0.80
   },
 
   "thresholds": {
     "hot": 0.8,
     "warm": 0.25,
-    "max_hot_files": 4,
-    "max_warm_files": 8,
+    "max_hot": 4,
+    "max_warm": 4,
     "max_chars": 25000
   }
 }

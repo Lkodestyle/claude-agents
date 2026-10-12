@@ -1,381 +1,285 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Context Router v2.0 - Intelligent Agent Activation
+Context Router v3 - Agent suggestions from prompt keywords
 
-Based on claude-cognitive patterns, this script provides:
-- Keyword-based activation of agent documentation
-- Co-activation of related agents
-- Decay mechanism for unused agents
-- Tiered injection (HOT/WARM/COLD)
+Runs on every UserPromptSubmit. Scores each agent from the keywords in the
+prompt (plus co-activation and a per-turn decay so recent topics linger) and
+emits ONE short line naming the agents worth delegating to, e.g.:
 
-Usage: Called by Claude Code hooks (UserPromptSubmit)
+    [context-router] Suggested agents: terraform, aws · related: networking · skill: infrastructure-as-code
+
+It never injects the agent files themselves: Claude Code already gives each
+subagent its own prompt, so repeating it in the main context only burns tokens.
+Set "output": "full" in keywords.json to get the old HOT/WARM content injection.
+
+State lives under ~/.claude/router/<project>.json (never inside the project).
 """
 
+import io
 import json
 import os
-import sys
 import re
-import io
-from pathlib import Path
+import sys
+import unicodedata
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional
+from pathlib import Path
+from typing import Dict, List, Tuple
 
-# Fix Windows encoding issues - ensure UTF-8 output
+# Windows terminals: make sure we emit UTF-8 regardless of the console codepage.
 if sys.platform == "win32":
-    try:
-        # Only wrap if not already wrapped
-        if not isinstance(sys.stdout, io.TextIOWrapper) or sys.stdout.encoding.lower() != 'utf-8':
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    except (AttributeError, io.UnsupportedOperation):
-        # Fallback for older Python or special environments
-        pass
-    try:
-        if not isinstance(sys.stderr, io.TextIOWrapper) or sys.stderr.encoding.lower() != 'utf-8':
-            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except (AttributeError, io.UnsupportedOperation):
-        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if not isinstance(stream, io.TextIOWrapper) or (stream.encoding or "").lower() != "utf-8":
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, io.UnsupportedOperation):
+            pass
+
+DEFAULTS = {
+    "thresholds": {"hot": 0.8, "warm": 0.25, "max_hot": 4, "max_warm": 4, "max_chars": 25000},
+    "co_activation_boost": 0.35,
+    "default_decay": 0.75,
+    "output": "compact",
+    "history": False,
+}
 
 
-def get_project_root() -> Path:
-    """Find project root by looking for .claude directory."""
+# --------------------------------------------------------------------------
+# Locations
+# --------------------------------------------------------------------------
+
+def project_root() -> Path:
+    """Project dir: what Claude Code says, else the nearest .claude/ upwards."""
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env:
+        return Path(env)
     cwd = Path.cwd()
-
-    # Check current directory
-    if (cwd / ".claude").exists():
-        return cwd
-
-    # Walk up the directory tree
-    for parent in cwd.parents:
-        if (parent / ".claude").exists():
-            return parent
-
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / ".claude").exists():
+            return candidate
     return cwd
 
 
-def get_claude_dir() -> Path:
-    """Get the .claude directory path."""
-    # Check environment variable first
-    env_root = os.environ.get("CONTEXT_DOCS_ROOT")
-    if env_root:
-        return Path(env_root)
-
-    # Check project-local .claude
-    project_root = get_project_root()
-    project_claude = project_root / ".claude"
-    if project_claude.exists():
-        return project_claude
-
-    # Fallback to global ~/.claude
-    home_claude = Path.home() / ".claude"
-    if home_claude.exists():
-        return home_claude
-
-    return project_claude
+def global_claude_dir() -> Path:
+    env = os.environ.get("CONTEXT_DOCS_ROOT")
+    return Path(env) if env else Path.home() / ".claude"
 
 
-def load_config(claude_dir: Path) -> dict:
-    """Load keywords.json configuration."""
-    config_path = claude_dir / "keywords.json"
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {
-        "keywords": {},
-        "co_activation": {},
-        "pinned": [],
-        "decay_rates": {},
-        "thresholds": {
-            "hot": 0.8,
-            "warm": 0.25,
-            "max_hot_files": 4,
-            "max_warm_files": 8,
-            "max_chars": 25000
-        }
-    }
+def find_config() -> Tuple[Path, Path]:
+    """Return (keywords.json path, dir holding agents/).
+
+    A project may ship its own keywords.json to override the global one; the
+    agents folder is only needed for "full" output mode.
+    """
+    for base in (project_root() / ".claude", global_claude_dir()):
+        cfg = base / "keywords.json"
+        if cfg.exists():
+            return cfg, base
+    return global_claude_dir() / "keywords.json", global_claude_dir()
 
 
-def load_attention_state(claude_dir: Path) -> dict:
-    """Load current attention state."""
-    state_path = claude_dir / "attn_state.json"
-    if state_path.exists():
-        with open(state_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {
-        "scores": {},
-        "turn_count": 0,
-        "last_update": None
-    }
+def state_path() -> Path:
+    """One state file per project, kept OUT of the project tree."""
+    root = project_root()
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", str(root)).strip("-")[-80:] or "root"
+    return global_claude_dir() / "router" / f"{slug}.json"
 
 
-def save_attention_state(claude_dir: Path, state: dict) -> None:
-    """Save attention state."""
-    state_path = claude_dir / "attn_state.json"
-    state["last_update"] = datetime.now().isoformat()
-    with open(state_path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+# --------------------------------------------------------------------------
+# IO
+# --------------------------------------------------------------------------
+
+def load_json(path: Path, fallback):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return fallback
 
 
-def get_prompt_from_stdin() -> str:
-    """Read prompt from stdin (provided by Claude Code hook)."""
-    if not sys.stdin.isatty():
-        try:
-            input_data = sys.stdin.read()
-            data = json.loads(input_data)
-            return data.get("prompt", "")
-        except (json.JSONDecodeError, KeyError):
-            return input_data
-    return ""
+def save_json(path: Path, data) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+    except OSError:
+        pass  # state is a nice-to-have; never fail the hook over it
 
 
-def find_keyword_matches(prompt: str, config: dict) -> List[str]:
-    """Find agent files that match keywords in the prompt."""
-    prompt_lower = prompt.lower()
-    matched_files = []
+def read_prompt() -> str:
+    if sys.stdin.isatty():
+        return ""
+    raw = sys.stdin.read()
+    try:
+        return json.loads(raw).get("prompt", "")
+    except (json.JSONDecodeError, AttributeError):
+        return raw
 
+
+def normalize(text: str) -> str:
+    """Lowercase and strip accents so 'aplicación' matches 'aplicacion'."""
+    text = unicodedata.normalize("NFKD", text.lower())
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
+def agent_name(file_path: str) -> str:
+    return Path(file_path).stem
+
+
+# --------------------------------------------------------------------------
+# Scoring
+# --------------------------------------------------------------------------
+
+def match_keywords(prompt: str, config: dict) -> List[str]:
+    prompt = normalize(prompt)
+    matched = []
     for file_path, keywords in config.get("keywords", {}).items():
         for keyword in keywords:
-            # Use word boundaries for more precise matching
-            pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
-            if re.search(pattern, prompt_lower):
-                if file_path not in matched_files:
-                    matched_files.append(file_path)
+            if re.search(r"\b" + re.escape(normalize(keyword)) + r"\b", prompt):
+                matched.append(file_path)
                 break
+    return matched
 
-    return matched_files
 
-
-def apply_decay(scores: dict, config: dict) -> dict:
-    """Apply decay to all attention scores."""
+def update_scores(scores: Dict[str, float], matched: List[str], config: dict) -> Dict[str, float]:
     decay_rates = config.get("decay_rates", {})
-    default_decay = 0.75
+    default_decay = config.get("default_decay", DEFAULTS["default_decay"])
+    boost = config.get("co_activation_boost", DEFAULTS["co_activation_boost"])
 
-    new_scores = {}
-    for file_path, score in scores.items():
-        decay_rate = decay_rates.get(file_path, default_decay)
-        new_scores[file_path] = score * decay_rate
+    for file_path in config.get("keywords", {}):
+        scores.setdefault(file_path, 0.0)
 
-    return new_scores
+    scores = {k: v * decay_rates.get(k, default_decay) for k, v in scores.items()}
 
-
-def apply_activation(scores: dict, matched_files: List[str]) -> dict:
-    """Apply activation to matched files (set to 1.0)."""
-    for file_path in matched_files:
+    for file_path in matched:
         scores[file_path] = 1.0
-    return scores
+    for file_path in matched:
+        for related in config.get("co_activation", {}).get(file_path, []):
+            scores[related] = min(1.0, scores.get(related, 0.0) + boost)
 
-
-def apply_co_activation(scores: dict, matched_files: List[str], config: dict) -> dict:
-    """Apply co-activation boost to related files."""
-    co_activation = config.get("co_activation", {})
-    boost = 0.35
-
-    for matched_file in matched_files:
-        related_files = co_activation.get(matched_file, [])
-        for related_file in related_files:
-            current_score = scores.get(related_file, 0)
-            scores[related_file] = min(1.0, current_score + boost)
+    warm = config.get("thresholds", {}).get("warm", DEFAULTS["thresholds"]["warm"])
+    for file_path in config.get("pinned", []):
+        scores[file_path] = max(scores.get(file_path, 0.0), warm + 0.1)
 
     return scores
 
 
-def apply_pinned(scores: dict, config: dict) -> dict:
-    """Ensure pinned files stay above WARM threshold."""
-    pinned = config.get("pinned", [])
-    thresholds = config.get("thresholds", {})
-    warm_threshold = thresholds.get("warm", 0.25)
+def categorize(scores: Dict[str, float], config: dict) -> Tuple[List[str], List[str]]:
+    th = {**DEFAULTS["thresholds"], **config.get("thresholds", {})}
+    # Backwards compatibility with the v2 key names.
+    max_hot = th.get("max_hot_files", th["max_hot"])
+    max_warm = th.get("max_warm_files", th["max_warm"])
 
-    for file_path in pinned:
-        current_score = scores.get(file_path, 0)
-        scores[file_path] = max(current_score, warm_threshold + 0.1)
-
-    return scores
-
-
-def categorize_files(scores: dict, config: dict) -> Tuple[List[str], List[str], List[str]]:
-    """Categorize files into HOT, WARM, COLD based on scores."""
-    thresholds = config.get("thresholds", {})
-    hot_threshold = thresholds.get("hot", 0.8)
-    warm_threshold = thresholds.get("warm", 0.25)
-    max_hot = thresholds.get("max_hot_files", 4)
-    max_warm = thresholds.get("max_warm_files", 8)
-
-    # Sort by score descending
-    sorted_files = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    hot_files = []
-    warm_files = []
-    cold_files = []
-
-    for file_path, score in sorted_files:
-        if score >= hot_threshold and len(hot_files) < max_hot:
-            hot_files.append(file_path)
-        elif score >= warm_threshold and len(warm_files) < max_warm:
-            warm_files.append(file_path)
-        else:
-            cold_files.append(file_path)
-
-    return hot_files, warm_files, cold_files
+    hot, warm = [], []
+    for file_path, score in sorted(scores.items(), key=lambda kv: kv[1], reverse=True):
+        if score >= th["hot"] and len(hot) < max_hot:
+            hot.append(file_path)
+        elif th["warm"] <= score < th["hot"] and len(warm) < max_warm:
+            warm.append(file_path)
+    return hot, warm
 
 
-def read_file_content(claude_dir: Path, file_path: str, full: bool = True) -> str:
-    """Read file content, optionally truncated to first 25 lines."""
-    full_path = claude_dir / file_path
-    if not full_path.exists():
+def suggest_skills(hot: List[str], config: dict) -> List[str]:
+    """A workflow skill is suggested when its anchor agent (first in the list)
+    and at least one other of its agents are HOT."""
+    hot_names = {agent_name(f) for f in hot}
+    return [skill for skill, agents in config.get("skills", {}).items()
+            if agents and agents[0] in hot_names and len(hot_names & set(agents)) >= 2]
+
+
+# --------------------------------------------------------------------------
+# Output
+# --------------------------------------------------------------------------
+
+def compact_output(hot: List[str], warm: List[str], skills: List[str]) -> str:
+    if not hot and not warm:
         return ""
+    parts = []
+    if hot:
+        parts.append("Suggested agents: " + ", ".join(agent_name(f) for f in hot))
+    if warm:
+        label = "related: " if hot else "Possibly relevant agents: "
+        parts.append(label + ", ".join(agent_name(f) for f in warm))
+    if skills:
+        parts.append("skill: " + ", ".join(skills))
+    return "[context-router] " + " · ".join(parts)
 
+
+def read_agent(base: Path, file_path: str, full: bool) -> str:
     try:
-        with open(full_path, "r", encoding="utf-8") as f:
-            if full:
-                return f.read()
-            else:
-                lines = f.readlines()[:25]
-                return "".join(lines)
-    except Exception:
+        with open(base / file_path, "r", encoding="utf-8") as fh:
+            return fh.read() if full else "".join(fh.readlines()[:25])
+    except OSError:
         return ""
 
 
-def build_context_injection(
-    claude_dir: Path,
-    hot_files: List[str],
-    warm_files: List[str],
-    scores: dict,
-    config: dict
-) -> str:
-    """Build the context string to inject."""
-    thresholds = config.get("thresholds", {})
-    max_chars = thresholds.get("max_chars", 25000)
-
-    output_parts = []
-    total_chars = 0
-
-    # Header
-    header = "## 🧠 Active Agent Context\n\n"
-    output_parts.append(header)
-    total_chars += len(header)
-
-    # HOT files (full content)
-    if hot_files:
-        hot_header = "### 🔥 HOT (Full Context)\n\n"
-        output_parts.append(hot_header)
-        total_chars += len(hot_header)
-
-        for file_path in hot_files:
-            content = read_file_content(claude_dir, file_path, full=True)
-            score = scores.get(file_path, 0)
-
-            file_section = f"#### {file_path} (score: {score:.2f})\n\n{content}\n\n---\n\n"
-
-            if total_chars + len(file_section) <= max_chars:
-                output_parts.append(file_section)
-                total_chars += len(file_section)
-
-    # WARM files (headers only - first 25 lines)
-    if warm_files:
-        warm_header = "### 🌡️ WARM (Headers Only)\n\n"
-        output_parts.append(warm_header)
-        total_chars += len(warm_header)
-
-        for file_path in warm_files:
-            content = read_file_content(claude_dir, file_path, full=False)
-            score = scores.get(file_path, 0)
-
-            file_section = f"#### {file_path} (score: {score:.2f})\n\n{content}\n\n---\n\n"
-
-            if total_chars + len(file_section) <= max_chars:
-                output_parts.append(file_section)
-                total_chars += len(file_section)
-
-    # Footer with stats
-    footer = f"\n*Context Router: {len(hot_files)} HOT, {len(warm_files)} WARM, {total_chars} chars*\n"
-    output_parts.append(footer)
-
-    return "".join(output_parts)
+def full_output(base: Path, hot: List[str], warm: List[str], scores: Dict[str, float], config: dict) -> str:
+    """Legacy v2 behaviour: inject agent files (HOT = full, WARM = header)."""
+    max_chars = config.get("thresholds", {}).get("max_chars", DEFAULTS["thresholds"]["max_chars"])
+    out = ["## 🧠 Active Agent Context\n\n"]
+    total = len(out[0])
+    for title, files, full in (("### 🔥 HOT (Full Context)\n\n", hot, True),
+                               ("### 🌡️ WARM (Headers Only)\n\n", warm, False)):
+        if not files:
+            continue
+        out.append(title)
+        total += len(title)
+        for file_path in files:
+            section = f"#### {file_path} (score: {scores.get(file_path, 0):.2f})\n\n{read_agent(base, file_path, full)}\n\n---\n\n"
+            if total + len(section) <= max_chars:
+                out.append(section)
+                total += len(section)
+    out.append(f"\n*Context Router: {len(hot)} HOT, {len(warm)} WARM, {total} chars*\n")
+    return "".join(out)
 
 
-def log_attention_history(claude_dir: Path, state: dict, hot: List[str], warm: List[str], prompt: str) -> None:
-    """Append to attention history for analytics."""
-    history_path = claude_dir / "attention_history.jsonl"
-
-    entry = {
-        "turn": state.get("turn_count", 0),
-        "timestamp": datetime.now().isoformat(),
-        "prompt_preview": prompt[:100] if prompt else "",
-        "hot": hot,
-        "warm": warm,
-        "scores_snapshot": {k: round(v, 2) for k, v in list(state.get("scores", {}).items())[:10]}
-    }
-
+def log_history(state_file: Path, turn: int, prompt: str, hot: List[str], warm: List[str]) -> None:
+    entry = {"turn": turn, "timestamp": datetime.now().isoformat(),
+             "prompt_preview": prompt[:100], "hot": hot, "warm": warm}
     try:
-        with open(history_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-    except Exception:
-        pass  # Don't fail if history logging fails
+        with open(state_file.with_suffix(".history.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass
 
 
-def main():
-    """Main context routing logic."""
+# --------------------------------------------------------------------------
+# Main
+# --------------------------------------------------------------------------
+
+def main() -> None:
     # Jarvis voice sessions must skip the router: no agent-context injection
     if os.environ.get("JARVIS_VOICE") == "1":
         return
 
-    # Get directories
-    claude_dir = get_claude_dir()
-
-    if not claude_dir.exists():
-        print("", end="")  # No output if no .claude directory
+    prompt = read_prompt()
+    if not prompt.strip():
         return
 
-    # Load configuration and state
-    config = load_config(claude_dir)
-    state = load_attention_state(claude_dir)
-
-    # Get prompt from stdin
-    prompt = get_prompt_from_stdin()
-
-    if not prompt:
-        print("", end="")
+    cfg_path, base = find_config()
+    config = {**DEFAULTS, **load_json(cfg_path, {})}
+    if not config.get("keywords"):
         return
 
-    # Initialize scores if empty
-    scores = state.get("scores", {})
+    state_file = state_path()
+    state = load_json(state_file, {"scores": {}, "turn_count": 0})
 
-    # Initialize all agent files with 0 if not present
-    for file_path in config.get("keywords", {}).keys():
-        if file_path not in scores:
-            scores[file_path] = 0.0
+    matched = match_keywords(prompt, config)
+    scores = update_scores(state.get("scores", {}), matched, config)
+    hot, warm = categorize(scores, config)
 
-    # Step 1: Apply decay to all scores
-    scores = apply_decay(scores, config)
+    state.update({"scores": scores, "turn_count": state.get("turn_count", 0) + 1,
+                  "last_update": datetime.now().isoformat()})
+    save_json(state_file, state)
+    if config.get("history"):
+        log_history(state_file, state["turn_count"], prompt, hot, warm)
 
-    # Step 2: Find keyword matches
-    matched_files = find_keyword_matches(prompt, config)
-
-    # Step 3: Apply activation to matched files
-    scores = apply_activation(scores, matched_files)
-
-    # Step 4: Apply co-activation
-    scores = apply_co_activation(scores, matched_files, config)
-
-    # Step 5: Apply pinned files
-    scores = apply_pinned(scores, config)
-
-    # Step 6: Categorize files
-    hot_files, warm_files, cold_files = categorize_files(scores, config)
-
-    # Step 7: Build context injection
-    context = build_context_injection(claude_dir, hot_files, warm_files, scores, config)
-
-    # Step 8: Update state
-    state["scores"] = scores
-    state["turn_count"] = state.get("turn_count", 0) + 1
-    save_attention_state(claude_dir, state)
-
-    # Step 9: Log history
-    log_attention_history(claude_dir, state, hot_files, warm_files, prompt)
-
-    # Output context (Claude Code will inject this)
-    print(context)
+    if config.get("output") == "full":
+        output = full_output(base, hot, warm, scores, config)
+    else:
+        output = compact_output(hot, warm, suggest_skills(hot, config))
+    if output:
+        print(output)
 
 
 if __name__ == "__main__":

@@ -78,17 +78,20 @@ Este repositorio incluye funcionalidades cognitivas avanzadas inspiradas en [cla
 
 ### Context Router
 
-Activacion inteligente de agentes basada en keywords:
+Sugerencia de agentes basada en keywords, en UNA linea por prompt:
 
-- **HOT** (score > 0.8): Inyeccion completa del agente
-- **WARM** (score 0.25-0.8): Solo headers del agente
-- **COLD** (score < 0.25): Agente no inyectado
+```
+[context-router] Suggested agents: terraform, aws · related: networking · skill: infrastructure-as-code
+```
 
-Caracteristicas:
-- Activacion por palabras clave (configurado en `keywords.json`)
-- Co-activacion de agentes relacionados
-- Decay gradual de agentes no mencionados
-- Archivos fijados (pinned) que siempre estan disponibles
+- **HOT** (score >= 0.8): aparece en `Suggested agents` → delegar a ese agente
+- **WARM** (score 0.25-0.8): aparece en `related` → tenerlo en cuenta
+- **COLD** (score < 0.25): no aparece
+
+No inyecta el contenido de los agentes (cada subagente ya recibe su propio prompt al
+invocarlo). Config en `~/.claude/keywords.json` (keywords en ingles y espanol, sin
+acentos), estado en `~/.claude/router/<proyecto>.json`, historial opt-in. `"output": "full"`
+restaura la inyeccion de contenido de la v2.
 
 ### Pool Coordinator
 

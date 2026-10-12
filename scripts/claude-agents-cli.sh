@@ -391,6 +391,21 @@ remove_entries() {
     rmdir "$dst_dir" 2>/dev/null && log_info "Removed $kind" || log_info "Removed our $kind (folder kept: it still has your own files)"
 }
 
+# Router v2 kept its state next to keywords.json (global AND inside every
+# project's .claude/). v3 keeps it under ~/.claude/router/, so the old files
+# are dead weight: remove them from the install dir and the current project.
+cleanup_legacy_state() {
+    local dir f
+    for dir in "$CLAUDE_HOME" "$(pwd)/.claude"; do
+        for f in attn_state.json attention_history.jsonl; do
+            if [[ -f "$dir/$f" ]]; then
+                rm -f "$dir/$f"
+                log_step "Removed legacy router state: $dir/$f"
+            fi
+        done
+    done
+}
+
 # Install (or refresh) agents, scripts, commands and skills into $install_dir.
 install_tree() {
     local install_dir="$1" mode="$2"
@@ -455,6 +470,7 @@ cmd_install() {
     fi
 
     install_tree "$install_dir" "$mode"
+    cleanup_legacy_state
 
     # Install config files
     log_step "Installing configuration files..."
@@ -498,6 +514,7 @@ cmd_sync() {
     [[ "$(install_mode_of "$REPO_DIR/.claude/agents" "$GLOBAL_AGENTS")" == symlinked* ]] && mode="symlink"
     log_info "Detected install mode: $mode"
     install_tree "$CLAUDE_HOME" "$mode"
+    cleanup_legacy_state
 
     # Always sync keywords.json (may have been updated)
     log_step "Syncing keywords.json..."
@@ -602,11 +619,11 @@ cmd_status() {
         log_warn "Keywords config: missing"
     fi
 
-    if [[ -f "$CLAUDE_HOME/attn_state.json" ]]; then
-        local turn_count=$($PYTHON_BIN -c "import json; print(json.load(open('$CLAUDE_HOME/attn_state.json')).get('turn_count', 0))" 2>/dev/null || echo "?")
-        log_info "Attention state: $turn_count turns tracked"
+    if [[ -d "$CLAUDE_HOME/router" ]]; then
+        local projects=$(ls -1 "$CLAUDE_HOME/router"/*.json 2>/dev/null | wc -l)
+        log_info "Router state: $projects project(s) tracked in $CLAUDE_HOME/router/"
     else
-        log_warn "Attention state: not initialized"
+        log_warn "Router state: not initialized (runs on first prompt)"
     fi
 
     if [[ -f "$CLAUDE_HOME/pool/instance_state.jsonl" ]]; then

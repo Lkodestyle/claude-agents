@@ -135,52 +135,63 @@ Inspired by [claude-cognitive](https://github.com/GMaN1911/claude-cognitive), th
 
 ### Context Router
 
-The Context Router automatically activates relevant agents based on conversation keywords:
+The Context Router nudges Claude towards the right agents, in one line per prompt:
 
 ```
-User: "Help me deploy a Kubernetes pod with Terraform"
-      ↓ Keywords detected: kubernetes, terraform, deploy
-      ↓ Primary agents: kubernetes, terraform
-      ↓ Co-activated: docker, cicd, networking
+User: "armá un pipeline de github actions que buildee el dockerfile y deploye a ecs"
+      ↓
+[context-router] Suggested agents: cicd, docker, aws · related: networking, terraform · skill: deploy-pipeline
 ```
+
+It does **not** inject the agent files themselves: each subagent already gets
+its own prompt when invoked, so repeating it in the main context only costs
+tokens (the v2 router injected up to 25k chars per prompt).
 
 **How it works:**
 
-1. **Keyword Matching** - Scans prompts for keywords defined in `keywords.json`
-2. **Attention Scores** - Each agent has a score (0.0 - 1.0) based on relevance
-3. **Decay Mechanism** - Unused agents gradually lose attention over time
-4. **Co-activation** - Related agents get a boost when primary agents activate
+1. **Keyword Matching** - whole-word, case- and accent-insensitive, English and Spanish
+2. **Attention Scores** - each agent has a score (0.0 - 1.0); a match sets it to 1.0
+3. **Decay** - scores fade per turn, so a topic from a few prompts ago is still "related"
+4. **Co-activation** - related agents get a boost when a primary agent fires
+5. **Skill hint** - when 2+ agents of a workflow skill are HOT, the skill is suggested
 
-**Activation Tiers:**
+**Tiers:**
 
-| Tier | Score | Injection |
-|------|-------|-----------|
-| HOT | > 0.8 | Full agent content |
-| WARM | 0.25 - 0.8 | Headers only (first 25 lines) |
-| COLD | < 0.25 | Not injected |
+| Tier | Score | Output |
+|------|-------|--------|
+| HOT | >= 0.8 | `Suggested agents:` |
+| WARM | 0.25 - 0.8 | `related:` |
+| COLD | < 0.25 | nothing |
 
-**Configuration:**
+**Where things live:**
 
-Edit `.claude/keywords.json` to customize:
+- Config: `~/.claude/keywords.json` (a project can override it with its own `.claude/keywords.json`)
+- State: `~/.claude/router/<project>.json` — never inside the project tree
+- History: off by default (`"history": true` writes `<project>.history.jsonl` next to the state)
+
+**Configuration** (`keywords.json`):
 
 ```json
 {
+  "output": "compact",            // "full" restores the v2 content injection
+  "history": false,
   "keywords": {
-    "agents/terraform.md": ["terraform", "hcl", "tfvars", "module"],
+    "agents/terraform.md": ["terraform", "hcl", "tfvars", "terragrunt"],
     "agents/aws.md": ["aws", "ec2", "lambda", "s3"]
   },
   "co_activation": {
     "agents/terraform.md": ["agents/aws.md", "agents/networking.md"]
   },
-  "pinned": ["agents/architecture.md"],
-  "thresholds": {
-    "hot": 0.8,
-    "warm": 0.25,
-    "max_hot_files": 4,
-    "max_chars": 25000
-  }
+  "skills": {
+    "infrastructure-as-code": ["terraform", "networking", "aws", "azure"]
+  },
+  "pinned": [],
+  "thresholds": { "hot": 0.8, "warm": 0.25, "max_hot": 4, "max_warm": 4 }
 }
 ```
+
+Keep keywords specific. Generic words (`plan`, `app`, `test`, `state`, `image`)
+fire on unrelated prompts and were removed in v3.
 
 ### Pool Coordinator
 
