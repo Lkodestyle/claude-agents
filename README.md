@@ -5,7 +5,6 @@ A comprehensive collection of specialized AI agents for Claude Code, focused on 
 ## Features
 
 - **15 Specialized Agents** - DevOps, Cloud, IaC, and development expertise
-- **8 Slash Commands** - `/commit`, `/pr`, `/review-changes`, `/test`, `/explain`, `/refactor`, `/diagnose`, `/doc`
 - **Cognitive Context Router** - Intelligent agent activation based on conversation keywords
 - **Pool Coordinator** - Multi-instance coordination for teams
 - **Memory Manager** - MCP memory management utilities
@@ -21,7 +20,7 @@ cd ~/claude-agents
 # Full setup (agents + MCP + Obsidian + plugins — interactive)
 ./scripts/setup.sh
 
-# Or install only agents/commands/skills
+# Or install only agents/skills
 ./scripts/claude-agents-cli.sh install
 
 # Verify installation
@@ -29,7 +28,7 @@ cd ~/claude-agents
 ```
 
 The `setup.sh` script runs a complete onboarding in 4 steps:
-1. Install agents, commands, skills, and scripts (symlink or copy)
+1. Install agents, skills, and scripts (symlink or copy)
 2. Configure MCP servers (memory, context7, notion, supabase)
 3. Setup Obsidian vault with full structure (folders, templates, guides)
 4. Enable recommended plugins (superpowers, skill-creator)
@@ -58,16 +57,10 @@ The `setup.sh` script runs a complete onboarding in 4 steps:
 
 ## Slash Commands
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `/commit` | Generate conventional commit message | `git add . && /commit` |
-| `/pr` | Create PR with auto-generated description | `/pr` |
-| `/review-changes` | Code review staged changes or files | `/review-changes` or `/review-changes src/file.ts` |
-| `/test` | Generate unit tests for code | `/test src/utils.ts` |
-| `/explain` | Explain how code works | `/explain src/auth/` |
-| `/refactor` | Suggest and apply refactoring | `/refactor src/legacy.ts` |
-| `/diagnose` | Help debug errors | `/diagnose "TypeError: cannot read..."` |
-| `/doc` | Generate documentation | `/doc src/api/` |
+None. The repo used to ship 8 (`/commit`, `/pr`, `/review`, `/test`, `/explain`,
+`/refactor`, `/debug`, `/doc`); ten months of prompt history showed zero uses, since
+the same requests work in natural language and the agents/skills handle them. Repeated
+workflows live as skills instead.
 
 ## Skills
 
@@ -78,6 +71,18 @@ Installed automatically with `claude-agents-cli.sh install` into `~/.claude/skil
 | Skill | Purpose |
 |-------|---------|
 | `agents-hub` | Canonical entry point: routes any task to the right agent(s), maps co-activation, and explains how to fan work out to agents with the Agent tool. Use it at the start of any technical task. |
+
+### Day-to-day Skills
+
+Transversal to any project. They read `~/.claude/vault.json` (per machine, never in
+git) to know which Obsidian vault to use, so the same skill works on a personal PC and
+on a work PC with a different, local-only vault.
+
+| Skill | Triggers on | What it does |
+|-------|-------------|--------------|
+| `session-resume` | "where were we", "por dónde nos quedamos", "retomemos" | Rebuilds context from the vault's project + last session note, git, open PRs and plan files; proposes the next step |
+| `session-save` | "write it to the vault", "anotá todo", "cerremos la sesión" | Dated session note + project status + index in the vault, following its rules; durable facts to memory; shows the draft first |
+| `git-flow` | "commit it", "open the PR", "commitealo y abrí el PR" | Branch from the right base, conventional commits without Co-Authored-By, PR in the repo's language, confirmation before push/merge, post-merge check |
 
 ### Workflow Skills
 
@@ -331,7 +336,7 @@ go install github.com/tbxark/mcp-proxy@latest
 ./scripts/claude-agents-cli.sh <command> [options]
 
 Commands:
-  install     Install agents, commands, skills, and scripts
+  install     Install agents, skills, and scripts
               --symlink   Use symlinks (default, auto-updates)
               --copy      Copy files (independent)
               --global    Install to ~/.claude (default)
@@ -339,7 +344,7 @@ Commands:
 
   sync        Sync config after git pull (for --copy installs)
 
-  status      Show installation status (agents, commands, skills)
+  status      Show installation status (agents, skills, hooks)
 
   test        Test context router and pool coordinator
 
@@ -350,7 +355,7 @@ Commands:
 
   plugins     Show recommended plugins and installation guide
 
-  uninstall   Remove installed agents, commands, skills, and scripts
+  uninstall   Remove installed agents, skills, and scripts
 
   help        Show help message
 ```
@@ -363,7 +368,8 @@ The hooks are defined once in `scripts/hooks.json` and installed by
 | Hook | Script | Function |
 |------|--------|----------|
 | `UserPromptSubmit` | `context-router.py` | Activate agents based on keywords |
-| `SessionStart` | `pool-loader.py` | Load state from other instances |
+| `SessionStart` | `session-health.py` | Warn about Obsidian down, vault not mounted, duplicated hooks, broken agent links |
+| `SessionStart` | `pool-loader.py` | Load state from other instances (only with `CLAUDE_INSTANCE`) |
 | `Stop` | `pool-extractor.py` | Save completion signals |
 
 The installer **merges** into your existing `settings.json`: it only replaces
@@ -435,7 +441,6 @@ claude-agents/
 │   │   ├── security.md
 │   │   ├── terraform.md
 │   │   └── web.md
-│   ├── commands/             # Slash commands
 │   │   ├── commit.md
 │   │   ├── diagnose.md
 │   │   ├── doc.md
@@ -516,7 +521,7 @@ cd .claude/worktrees/feature-a && claude
 
 **4. Keep CLAUDE.md alive** — After every correction, tell Claude: *"Update CLAUDE.md so you don't make that mistake again."* The error rate drops measurably over time.
 
-**5. Slash commands for repetitive work** — If you do something more than once a day, make it a command in `.claude/commands/`.
+**5. Skills for repetitive work** — If you do something more than once a day, make it a skill in `.claude/skills/<name>/SKILL.md` so it triggers from natural language.
 
 **6. PostToolUse hook for formatting** — Auto-format after every Write/Edit to prevent CI failures:
 ```json

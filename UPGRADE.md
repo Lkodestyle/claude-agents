@@ -13,14 +13,13 @@ How to update your Claude Agents installation without losing your existing memor
 ├── settings.local.json      # ✅ Your local settings - preserved
 ├── agents/                  # 🔄 Our 15 files updated; anything else you keep there is preserved
 ├── scripts/                 # 🔄 Our scripts updated; other tools' scripts preserved
-├── commands/                # 🔄 Our 8 commands updated; your own commands preserved
 ├── skills/                  # 🔄 Our 6 skills updated; other skills (plugins, your own) preserved
 ├── keywords.json            # 🔄 Updated
 ├── settings.json            # 🔄 MERGED: only our 3 hooks + permissions; model/theme/other hooks preserved
 └── backups/claude-agents-*/ # 📦 Files of ours you had modified locally, moved here before updating
 ```
 
-Agents, scripts, commands and skills are installed **entry by entry** (one
+Agents, scripts and skills are installed **entry by entry** (one
 symlink or copy per file/folder), never as a whole-folder replacement.
 
 ## Quick Upgrade
@@ -62,10 +61,9 @@ git pull
 # 2. Backup your memory (optional but recommended)
 cp ~/.claude/memory.json ~/.claude/memory.backup.json
 
-# 3. Update agents, scripts, commands and skills (file by file, keeps your own)
+# 3. Update agents, scripts and skills (file by file, keeps your own)
 cp -r ~/claude-agents/.claude/agents/*   ~/.claude/agents/
 cp -r ~/claude-agents/.claude/scripts/*  ~/.claude/scripts/
-cp -r ~/claude-agents/.claude/commands/* ~/.claude/commands/
 cp -r ~/claude-agents/.claude/skills/*   ~/.claude/skills/
 
 # 4. Update keywords
@@ -99,7 +97,6 @@ python3 ~/.claude/scripts/memory-manager.py stats
 # [✓] Claude home: /home/user/.claude
 # [✓] agents: symlinked
 # [✓] scripts: symlinked
-# [✓] commands: symlinked
 # [✓] skills: symlinked
 # [✓] context-router.py: global
 # [✓] pool-loader.py: global
@@ -123,15 +120,9 @@ After upgrading, you'll have access to:
 - `security` - CVE scanning, secrets detection
 - `mobile` - React Native, Expo, Flutter
 
-### Slash Commands (+8)
-- `/commit` - Generate conventional commit
-- `/pr` - Create pull request
-- `/review-changes` - Code review (was `/review`, which shadowed the built-in)
-- `/test` - Generate tests
-- `/explain` - Explain code
-- `/refactor` - Refactoring suggestions
-- `/diagnose` - Debug errors (was `/debug`, which shadowed the built-in)
-- `/doc` - Generate documentation
+### Slash Commands (removed)
+The 8 slash commands were removed: never used in practice, and two shadowed built-ins.
+`install`/`sync` delete the old links from `~/.claude/commands/`. Your own commands there are kept.
 
 ### Cognitive Features
 - **Context Router** - Auto-activates agents based on keywords

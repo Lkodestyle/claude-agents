@@ -168,7 +168,8 @@ Ejecuta `/agents` en Claude Code para ver y gestionar los agentes.
 
 ## Workflow Skills
 
-Este repositorio incluye una **skill guia** (`agents-hub`) mas **5 workflow skills** que orquestan multiples agentes para flujos completos:
+Este repositorio incluye una **skill guia** (`agents-hub`), **3 skills de dia a dia** (sesion y
+git, transversales a cualquier proyecto) y **5 workflow skills** que orquestan multiples agentes:
 
 | Skill | Agentes | Descripcion |
 |-------|---------|-------------|
@@ -178,6 +179,14 @@ Este repositorio incluye una **skill guia** (`agents-hub`) mas **5 workflow skil
 | `infrastructure-as-code` | terraform, networking, aws/azure, security, architecture | IaC completo: VPC + modulos Terraform + multi-ambiente |
 | `security-hardening` | security, docker, cicd, aws/azure | Audit de seguridad: dependencias + secrets + containers + pipeline |
 | `full-stack-scaffold` | architecture, web/mobile, databases, programming, docker | Scaffolding: API + DB + frontend + Docker Compose + tests |
+| `session-resume` | - | "Por donde nos quedamos": reconstruye contexto desde el vault de Obsidian de ESTA maquina (`~/.claude/vault.json`), git, PRs abiertos y archivos de plan |
+| `session-save` | - | "Anota todo en el vault": nota de sesion + estado del proyecto + indice, segun las rules del vault; muestra el borrador antes de escribir |
+| `git-flow` | - | "Commitealo y abri el PR": branch desde la base correcta, conventional commits sin Co-Authored-By, PR en el idioma del repo, confirmacion antes de push/merge, verificacion post-merge |
+
+**Vaults por maquina.** Las skills de sesion leen `~/.claude/vault.json` (ruta del vault, MCP
+a usar, carpeta de proyectos, nota indice, nota de rules). Es local y nunca se commitea: cada
+PC (personal, trabajo) tiene su propio vault y la misma skill. Si falta, la skill pregunta una
+vez y lo crea. El hook `session-health.py` avisa al arrancar si el vault no esta accesible.
 
 Los skills se instalan automaticamente con `claude-agents-cli.sh install` en `.claude/skills/`.
 
@@ -197,50 +206,12 @@ superpowers:verification-before-completion → Validar resultados
 
 ## Comandos (Slash Commands)
 
-Este repositorio incluye **8 comandos** listos para usar (Jarvis, el asistente por voz, vive ahora en su propio repo: https://github.com/Lkodestyle/jarvis):
-
-| Comando | Descripcion | Uso |
-|---------|-------------|-----|
-| `/commit` | Genera commit message con Conventional Commits | `git add . && /commit` |
-| `/pr` | Crea PR con descripcion auto-generada | `/pr` |
-| `/review-changes` | Code review de cambios staged o archivos | `/review-changes` o `/review-changes src/file.ts` |
-| `/test` | Genera unit tests para codigo | `/test src/utils.ts` |
-| `/explain` | Explica como funciona el codigo | `/explain src/auth/` |
-| `/refactor` | Sugiere y aplica refactoring | `/refactor src/legacy.ts` |
-| `/diagnose` | Ayuda a debuggear errores | `/diagnose "TypeError: cannot read..."` |
-
-`/review-changes` y `/diagnose` se llamaban `/review` y `/debug`; se renombraron porque
-pisaban los comandos nativos de Claude Code del mismo nombre.
-| `/doc` | Genera documentacion (README, JSDoc, docstrings) | `/doc src/api/` |
-
-### Ejemplos de Uso
-
-```bash
-# Hacer commit con mensaje generado
-git add .
-/commit
-
-# Crear PR
-/pr
-
-# Review de codigo
-/review-changes
-
-# Generar tests
-/test src/services/auth.ts
-
-# Explicar codigo complejo
-/explain src/algorithms/dijkstra.ts
-
-# Refactorizar codigo legacy
-/refactor src/old-module.js
-
-# Debuggear un error
-/diagnose "Cannot read property 'map' of undefined"
-
-# Generar documentacion
-/doc src/api/
-```
+Este repositorio **no instala slash commands**. Tenia 8 (`/commit`, `/pr`, `/review`,
+`/test`, `/explain`, `/refactor`, `/debug`, `/doc`) y en 10 meses de historial no se usaron
+ni una vez: lo mismo se pide en lenguaje natural ("commitealo y abri el PR") y los agentes
+y skills lo resuelven. Ademas `/review` y `/debug` pisaban comandos nativos de Claude Code.
+Los flujos que si se repiten viven como skills (ver "Workflow Skills"). Jarvis, el asistente
+por voz, vive en su propio repo: https://github.com/Lkodestyle/jarvis
 
 ## Plugins Recomendados
 
@@ -379,7 +350,7 @@ cd ~/claude-agents
 ./scripts/claude-agents-cli.sh status
 ```
 
-### Opcion 2: Solo agentes/commands/skills
+### Opcion 2: Solo agentes/skills
 
 ```bash
 # Instalar con symlinks (auto-actualiza con git pull)
@@ -442,7 +413,6 @@ claude-agents/
 │   │   ├── docker.md
 │   │   ├── finops.md
 │   │   └── security.md
-│   ├── commands/             # Slash Commands
 │   │   ├── commit.md         # /commit - Conventional commits
 │   │   ├── pr.md             # /pr - Create pull request
 │   │   ├── review-changes.md # /review-changes - Code review
@@ -457,7 +427,10 @@ claude-agents/
 │   │   ├── observability-setup/ # Monitoring + Logging + Alerting
 │   │   ├── infrastructure-as-code/ # Terraform + Networking + Cloud
 │   │   ├── security-hardening/    # Security audit + fix + compliance
-│   │   └── full-stack-scaffold/   # Project scaffolding completo
+│   │   ├── full-stack-scaffold/   # Project scaffolding completo
+│   │   ├── session-resume/   # Retomar: vault + git + PRs -> donde quedamos
+│   │   ├── session-save/     # Cerrar: nota de sesion + estado + indice en el vault
+│   │   └── git-flow/         # Commits + PR + merge con las convenciones del repo
 │   ├── scripts/              # Scripts utilitarios
 │   │   ├── context-router.py # Activacion inteligente
 │   │   ├── pool-loader.py    # Carga estado de pool
@@ -487,8 +460,9 @@ proposito: si proyecto y global tienen el mismo hook, corre dos veces por evento
 
 | Hook | Script | Funcion |
 |------|--------|---------|
-| `UserPromptSubmit` | `context-router.py` | Activa agentes segun keywords |
-| `SessionStart` | `pool-loader.py` | Carga estado de otras instancias |
+| `UserPromptSubmit` | `context-router.py` | Sugiere agentes segun keywords (una linea) |
+| `SessionStart` | `session-health.py` | Avisa si Obsidian/vault/hooks/agentes tienen problemas |
+| `SessionStart` | `pool-loader.py` | Carga estado de otras instancias (solo con CLAUDE_INSTANCE) |
 | `Stop` | `pool-extractor.py` | Guarda senales de completado |
 
 ### Tipos de Hooks Disponibles
@@ -540,7 +514,7 @@ detectado (`python3`/`python`/`py -3`), por ejemplo:
 "command": "python3 \"$HOME/.claude/scripts/context-router.py\""
 ```
 
-Agentes, scripts, commands y skills se instalan **entrada por entrada** (un symlink o
+Agentes, scripts y skills se instalan **entrada por entrada** (un symlink o
 copia por archivo/carpeta), asi que conviven con skills de plugins o commands propios que
 tengas en `~/.claude`. `claude-agents-cli.sh status` muestra el modo de instalacion y cuantas
 veces correria cada hook.
