@@ -137,7 +137,8 @@ def main() -> None:
         print("\n".join(f"[health] {p}" for p in problems))
     else:
         n_agents = len(list((claude_home() / "agents").glob("*.md")))
-        print(f"[health] OK: {n_agents} agents, hooks once, Obsidian reachable, vault configured")
+        vault = load_json(claude_home() / "vault.json").get("name", "vault")
+        print(f"[health] OK: {n_agents} agents, hooks once, {vault} reachable")
 
 
 if __name__ == "__main__":
