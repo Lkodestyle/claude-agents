@@ -1,5 +1,10 @@
 {
-  "_comment": "Hooks managed by claude-agents-cli.sh. Script paths are rewritten at install time; timeouts are in SECONDS.",
+  "_comment": "Settings managed by claude-agents-cli.sh (merged into the global settings.json). Script paths are rewritten at install time; hook timeouts are in SECONDS. statusLine is only set if the user has none.",
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/scripts/statusline.py\"",
+    "padding": 0
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
