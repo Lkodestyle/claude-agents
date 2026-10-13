@@ -223,7 +223,9 @@ export CLAUDE_INSTANCE=A
 export NOTION_TOKEN="ntn_your_token"
 
 # Optional: Increase MCP token limit if needed
-export MAX_MCP_OUTPUT_TOKENS=250000
+# Do NOT raise MAX_MCP_OUTPUT_TOKENS globally (default 25000): every MCP call may then
+# return up to that much. Prefer a per-tool override via _meta["anthropic/maxResultSizeChars"].
+# export MAX_MCP_OUTPUT_TOKENS=25000
 ```
 
 ## Questions?

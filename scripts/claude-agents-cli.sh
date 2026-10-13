@@ -188,6 +188,9 @@ for groups in managed.values():
             m = script_re.search(hook.get("command", ""))
             if m:
                 managed_scripts.add(m.group(1))
+sl_cmd = (load(hooks_src).get("statusLine") or {}).get("command", "")
+if script_re.search(sl_cmd):
+    managed_scripts.add(script_re.search(sl_cmd).group(1))
 
 
 def is_managed(hook):
@@ -224,6 +227,14 @@ for event, groups in managed.items():
         new_group["hooks"] = [rewrite(h) for h in group.get("hooks", [])]
         hooks.setdefault(event, []).append(new_group)
 merged["hooks"] = hooks
+
+# --- statusLine: set ours only if the user has none, or if theirs is ours
+# (so re-installs refresh the path). A custom user status line is left alone.
+managed_sl = load(hooks_src).get("statusLine")
+if managed_sl:
+    current = merged.get("statusLine") or {}
+    if not current or is_managed(current):
+        merged["statusLine"] = rewrite(managed_sl) if script_re.search(managed_sl.get("command", "")) else managed_sl
 
 # --- permissions: union, user's entries first.
 perms_repo = load(perms_src).get("permissions", {})
@@ -276,6 +287,9 @@ with open(os.environ["HOOKS_SRC"], encoding="utf-8") as fh:
                for m in [script_re.search(h["command"])] if m}
 with open(os.environ["DST"], encoding="utf-8") as fh:
     data = json.load(fh)
+sl = (data.get("statusLine") or {}).get("command", "")
+if "statusline.py" in sl:
+    data.pop("statusLine", None)
 hooks = {}
 for event, groups in data.get("hooks", {}).items():
     kept = []

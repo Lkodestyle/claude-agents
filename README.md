@@ -102,7 +102,7 @@ Complete end-to-end workflows that orchestrate multiple agents together.
 
 | Plugin | Description | Install |
 |--------|-------------|---------|
-| `superpowers` | 14 workflow skills: brainstorming, TDD, debugging, plans, code review, parallel agents | `claude config set enabledPlugins.superpowers@claude-plugins-official true` |
+| `superpowers` | 14 process skills: brainstorming, writing-plans, TDD, systematic-debugging, verification-before-completion, git worktrees, parallel agents | `claude plugin install superpowers@claude-plugins-official` then `claude plugin enable superpowers@claude-plugins-official` (check with `claude plugin list`) |
 | `skill-creator` | Create and test custom skills with eval framework | Via `/plugins` in Claude Code |
 | `context7` | Up-to-date library/framework documentation | Included in `.mcp.json` |
 
@@ -360,6 +360,22 @@ Commands:
   help        Show help message
 ```
 
+## Status Line
+
+`install`/`sync` also configure a status line (only if you have none; a custom one is left
+alone) from `.claude/scripts/statusline.py`:
+
+```
+Fable · claude-agents · main* ↑2 · PR #11
+ctx ████░░░░░░ 38% (76k/200k) · cache 91% warm · $0.42 · 12m · 5h 24% · 7d 41%
+```
+
+Line 1: model, project, git branch (`*` dirty, `↑n` unpushed), open PR, `fast`/effort when
+non-default. Line 2: context window usage (green/yellow/red), prompt-cache hit ratio and
+warm/cold, session cost and duration, 5-hour and 7-day rate-limit usage. Fields that Claude
+Code does not provide (older versions, no git) are skipped. To use your own, set
+`statusLine` in `~/.claude/settings.json`; the installer will not touch it.
+
 ## Hooks
 
 The hooks are defined once in `scripts/hooks.json` and installed by
@@ -413,7 +429,7 @@ Add to `.claude/settings.json`:
 | `GITHUB_TOKEN` | GitHub personal access token | For GitHub MCP |
 | `OBSIDIAN_API_KEY` | API key from Local REST API plugin | For Obsidian MCP |
 | `MCP_PROXY_TOKEN` | Token for mcp-proxy auth | For mcp-proxy |
-| `MAX_MCP_OUTPUT_TOKENS` | Token limit for MCP (default: 25000) | No |
+| `MAX_MCP_OUTPUT_TOKENS` | Token limit per MCP tool result (default 25000). Raising it globally raises the cost of every MCP call; prefer per-tool `_meta["anthropic/maxResultSizeChars"]` | No |
 
 ## Project Structure
 
@@ -461,6 +477,8 @@ claude-agents/
 │   │   ├── memory-manager.py
 │   │   ├── pool-extractor.py
 │   │   ├── pool-loader.py
+│   │   ├── session-health.py # SessionStart health check
+│   │   ├── statusline.py     # Status line (context, cache, cost, git)
 │   │   └── pool-query.py
 │   ├── keywords.json         # Keyword activation config
 │   └── settings.json         # Hooks configuration
