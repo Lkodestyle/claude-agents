@@ -452,6 +452,62 @@ install_mode_of() {
 }
 
 # ============================================================================
+# MODS (hooks-module plugins shipped in mods/, installed through the repo's
+# own marketplace so Claude Code reads them FROM THE REPO: a git pull + the
+# /reload-plugins command is enough to pick up changes)
+# ============================================================================
+
+MODS="session-band guardrails"
+MARKETPLACE="claude-agents"
+
+install_mods() {
+    if ! command -v claude &> /dev/null; then
+        log_warn "claude CLI not found: mods not installed (run 'claude plugin marketplace add $REPO_DIR' later)"
+        return 0
+    fi
+    log_step "Installing mods (plugins) from $REPO_DIR..."
+    if ! claude plugin marketplace list 2>/dev/null | grep -q "❯ $MARKETPLACE\b"; then
+        claude plugin marketplace add "$REPO_DIR" > /dev/null 2>&1 && log_info "Marketplace '$MARKETPLACE' registered (user scope)" \
+            || { log_warn "Could not register the marketplace"; return 0; }
+    fi
+    local m
+    for m in $MODS; do
+        if claude plugin list 2>/dev/null | grep -q "❯ $m@$MARKETPLACE"; then
+            log_info "mod $m: already installed"
+        else
+            claude plugin install "$m@$MARKETPLACE" -s user > /dev/null 2>&1 && log_info "mod $m: installed (user scope)" \
+                || log_warn "mod $m: install failed (try: claude plugin install $m@$MARKETPLACE)"
+        fi
+    done
+}
+
+remove_mods() {
+    command -v claude &> /dev/null || return 0
+    local m
+    for m in $MODS; do
+        claude plugin uninstall "$m@$MARKETPLACE" -s user -y > /dev/null 2>&1 && log_info "mod $m: uninstalled"
+    done
+    claude plugin marketplace remove "$MARKETPLACE" > /dev/null 2>&1 && log_info "Marketplace '$MARKETPLACE' removed"
+}
+
+mods_status() {
+    echo ""
+    echo -e "${BOLD}Mods:${NC}"
+    command -v claude &> /dev/null || { log_warn "claude CLI not found"; return 0; }
+    local listing m
+    listing=$(claude plugin list 2>/dev/null)
+    for m in $MODS; do
+        if echo "$listing" | grep -A5 "❯ $m@$MARKETPLACE" | grep -q "Status: .*enabled"; then
+            log_info "$m: enabled"
+        elif echo "$listing" | grep -q "❯ $m@$MARKETPLACE"; then
+            log_warn "$m: installed but disabled"
+        else
+            log_warn "$m: not installed (run install)"
+        fi
+    done
+}
+
+# ============================================================================
 # INSTALL
 # ============================================================================
 
@@ -492,6 +548,7 @@ cmd_install() {
 
     install_tree "$install_dir" "$mode"
     cleanup_legacy_state
+    [[ "$target" == "global" ]] && install_mods
 
     # Install config files
     log_step "Installing configuration files..."
@@ -534,6 +591,7 @@ cmd_sync() {
     log_info "Detected install mode: $mode"
     install_tree "$CLAUDE_HOME" "$mode"
     cleanup_legacy_state
+    install_mods
 
     # Always sync keywords.json (may have been updated)
     log_step "Syncing keywords.json..."
@@ -589,6 +647,8 @@ cmd_status() {
             log_error "$script: global=$n_global project=$n_project -> would run $((n_global + n_project)) times per event"
         fi
     done
+
+    mods_status
 
     # List agents
     echo ""
@@ -854,6 +914,7 @@ cmd_uninstall() {
     remove_entries "$REPO_DIR/.claude/scripts"  "$GLOBAL_SCRIPTS"  "scripts"
     remove_entries "$REPO_DIR/.claude/skills"   "$GLOBAL_SKILLS"   "skills"
     remove_managed_hooks "$CLAUDE_HOME/settings.json"
+    remove_mods
 
     # Keep config files by default
     log_warn "Preserved: keywords.json, permissions and any non-managed settings"

@@ -1,0 +1,6 @@
+{
+  "name": "session-band",
+  "version": "0.1.0",
+  "description": "Band above the prompt with where you left off (vault + git + PRs), a /vault pane, /health, and a reminder when a long session has not been saved to the vault",
+  "types": "./types/index.d.ts"
+}

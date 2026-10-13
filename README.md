@@ -277,31 +277,21 @@ Pre-configured MCP servers in `.mcp.json`:
 | `context7` | Up-to-date library documentation | Add "use context7" to prompts |
 | `supabase` | Supabase project interaction | OAuth (automatic) |
 | `notion` | Notion workspace access | `NOTION_TOKEN` env var |
-| `obsidian` | Obsidian vault read/write/search | `OBSIDIAN_API_KEY` + Local REST API plugin |
 
-### Obsidian Vault Setup
+### Obsidian (optional, per machine)
 
-Integrates your Obsidian vault via the **Local REST API** plugin (native MCP endpoint):
+The session skills read the vault through whatever `~/.claude/vault.json` names as `mcp`:
 
-**1. Install the plugin in Obsidian:**
-- Settings → Community Plugins → search **"Local REST API"** → Install & Enable
+- **`obsidian-vault`** (recommended): [`@bitbonsai/mcpvault`](https://www.npmjs.com/package/@bitbonsai/mcpvault),
+  file-based, works with Obsidian closed. Register it once per machine with that machine's vault path:
+  `claude mcp add obsidian-vault -s user -- npx @bitbonsai/mcpvault@latest /path/to/vault`
+- **`obsidian`** (Local REST API plugin, live edits while Obsidian is open): needs Obsidian running, the
+  plugin's HTTP server enabled (port 27123) and its API key. It is no longer in `.mcp.json`: it failed on
+  every machine where Obsidian was closed or the key unset. To use it on a machine:
+  `claude mcp add obsidian -s user -t http http://127.0.0.1:27123/mcp/ -H "Authorization: Bearer $OBSIDIAN_API_KEY"`
+- **`filesystem`**: plain reads/writes on `path`, no MCP at all.
 
-**2. Enable HTTP server:**
-- Settings → Local REST API → enable **"Enable HTTP server"**
-
-**3. Copy your API key** from that same settings screen
-
-**4. Set the environment variable:**
-```bash
-export OBSIDIAN_API_KEY="your_api_key_here"
-```
-
-The MCP server runs at `http://127.0.0.1:27123/mcp/` while Obsidian is open. No vault path needed — the plugin exposes whichever vault is currently loaded.
-
-To create the recommended vault folder structure (inbox, projects, areas, etc.):
-```bash
-./scripts/setup-obsidian.sh
-```
+`scripts/setup-obsidian.sh` walks through the REST setup if you want it.
 
 ### Setup
 
@@ -360,6 +350,21 @@ Commands:
   help        Show help message
 ```
 
+## Mods (interface plugins)
+
+Two hooks-module plugins live in `mods/` and are installed by `install`/`sync` through the
+repo's own marketplace (`.claude-plugin/marketplace.json`), at user scope. Claude Code reads
+them **from the repo folder**, so after a `git pull` a `/reload-plugins` is all it takes.
+
+| Mod | What you see |
+|-----|--------------|
+| `session-band` | At session start, a band above the prompt: last session note of this project in the vault (date, title, next steps), git branch/dirty/unpushed, open PRs. Hides on the first prompt. Adds `/vault` (pane with the last note's closing state and next steps) and `/health` (re-run the health check). After 3h of session with nothing written to the vault's sessions folder, a toast + native notification reminds you to save. |
+| `guardrails` | Invisible until needed. Hard denies: `git push --force` (unless `--force-with-lease`), deleting `main`/`master`, `git reset --hard` on main, `rm -rf` of `~` or `/`, edits to `.env*` (not `.env.example`), `secrets/`, `credentials.json`, `*token*.json`, SSH keys. Evidence guards: **no tests, no commit** (code files edited and no test/lint/typecheck run succeeded afterwards → `git commit` denied, only in repos with a runner; `SKIP_GUARD=1 git commit ...` to bypass), and a toast when a turn's answer claims success ("listo", "funciona", "tests en verde") without any verification command having run. |
+
+Manual install on a machine: `claude plugin marketplace add <repo path>` then
+`claude plugin install session-band@claude-agents` (same for `guardrails`). Remove with
+`claude plugin uninstall <mod>@claude-agents`. Both need Claude Code with mods support (v2.1.29x+).
+
 ## Status Line
 
 `install`/`sync` also configure a status line (only if you have none; a custom one is left
@@ -370,8 +375,9 @@ Fable · claude-agents · main* ↑2 · PR #11
 ctx ████░░░░░░ 38% (76k/200k) · cache 91% warm · $0.42 · 12m · 5h 24% · 7d 41%
 ```
 
-Line 1: model, project, git branch (`*` dirty, `↑n` unpushed), open PR, `fast`/effort when
-non-default. Line 2: context window usage (green/yellow/red), prompt-cache hit ratio and
+Line 1: model, project, git branch (`*` dirty, `↑n` unpushed), `vault Nd` (days since the last
+session note of this project in the machine's vault; yellow after a day, red after a week), open PR,
+`fast`/effort when non-default. Line 2: context window usage (green/yellow/red), prompt-cache hit ratio and
 warm/cold, session cost and duration, 5-hour and 7-day rate-limit usage. Fields that Claude
 Code does not provide (older versions, no git) are skipped. To use your own, set
 `statusLine` in `~/.claude/settings.json`; the installer will not touch it.

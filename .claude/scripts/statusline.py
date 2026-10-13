@@ -75,6 +75,28 @@ def git_branch(cwd: str) -> str:
     return f"{branch}{dirty}{ahead}"
 
 
+def vault_age(cwd: str) -> str:
+    """Days since the last session note of this project in the machine's vault
+    (~/.claude/vault.json); '' when there is no vault or no project folder."""
+    try:
+        with open(os.path.expanduser("~/.claude/vault.json"), encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        project = os.path.basename(cwd.rstrip("/"))
+        folder = (cfg.get("projects") or {}).get(project) or os.path.join(
+            cfg["path"], cfg.get("projects_dir", "02-projects"), project)
+        sessions = os.path.join(folder, cfg.get("sessions_subdir", "sesiones"))
+        notes = sorted(n for n in os.listdir(sessions) if n[:4].isdigit() and n.endswith(".md"))
+        if not notes:
+            return f"{YELLOW}vault: sin sesiones{RESET}"
+        import datetime
+        last = datetime.date.fromisoformat(notes[-1][:10])
+        days = (datetime.date.today() - last).days
+        c = GREEN if days <= 1 else YELLOW if days <= 7 else RED
+        return f"vault {c}{days}d{RESET}"
+    except Exception:
+        return ""
+
+
 def main() -> None:
     data = json.load(sys.stdin)
 
@@ -91,6 +113,9 @@ def main() -> None:
     pr = data.get("pr", {})
     if pr.get("number"):
         parts.append(f"PR #{pr['number']}")
+    vault = vault_age(cwd)
+    if vault:
+        parts.append(vault)
     if data.get("fast_mode"):
         parts.append(f"{YELLOW}fast{RESET}")
     effort = data.get("effort", {}).get("level")
