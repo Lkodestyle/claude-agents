@@ -359,7 +359,7 @@ them **from the repo folder**, so after a `git pull` a `/reload-plugins` is all 
 | Mod | What you see |
 |-----|--------------|
 | `session-band` | At session start, a band above the prompt: last session note of this project in the vault (date, title, next steps), git branch/dirty/unpushed, open PRs. Hides on the first prompt. Adds `/vault` (pane with the last note's closing state and next steps) and `/health` (re-run the health check). After 3h of session with nothing written to the vault's sessions folder, a toast + native notification reminds you to save. |
-| `guardrails` | Invisible until needed. Denies: `git push --force` (unless `--force-with-lease`), deleting `main`/`master`, `git reset --hard` on main, `rm -rf` of `~` or `/`, and edits to `.env*` (not `.env.example`), `secrets/`, `credentials.json`, `*token*.json`, SSH keys. |
+| `guardrails` | Invisible until needed. Hard denies: `git push --force` (unless `--force-with-lease`), deleting `main`/`master`, `git reset --hard` on main, `rm -rf` of `~` or `/`, edits to `.env*` (not `.env.example`), `secrets/`, `credentials.json`, `*token*.json`, SSH keys. Evidence guards: **no tests, no commit** (code files edited and no test/lint/typecheck run succeeded afterwards → `git commit` denied, only in repos with a runner; `SKIP_GUARD=1 git commit ...` to bypass), and a toast when a turn's answer claims success ("listo", "funciona", "tests en verde") without any verification command having run. |
 
 Manual install on a machine: `claude plugin marketplace add <repo path>` then
 `claude plugin install session-band@claude-agents` (same for `guardrails`). Remove with
