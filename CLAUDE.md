@@ -99,7 +99,11 @@ vault) mandan sobre las skills.
 - `timeout` de hooks es en **segundos**.
 - Router v3: una linea por prompt, sin inyectar contenido; estado en `~/.claude/router/`.
 - `session-health.py` avisa al arrancar si Obsidian/vault/hooks/agentes tienen problemas.
-- `statusline.py` muestra contexto, cache, costo y rate limits; se instala solo si no hay otro.
+- `statusline.py` muestra contexto, cache, costo, rate limits y dias desde la ultima nota de
+  sesion; se instala solo si no hay otro.
+- Mods en `mods/` (`session-band`, `guardrails`): plugins instalados desde el marketplace del
+  repo, leidos desde la carpeta del repo; tras un cambio, `/reload-plugins`. Validar con
+  `claude plugin validate mods/<mod>`.
 - Mantener este CLAUDE.md por debajo de 200 lineas: se carga entero en cada sesion.
 - No subir `MAX_MCP_OUTPUT_TOKENS` globalmente; override por herramienta si hace falta.
 

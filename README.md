@@ -350,6 +350,21 @@ Commands:
   help        Show help message
 ```
 
+## Mods (interface plugins)
+
+Two hooks-module plugins live in `mods/` and are installed by `install`/`sync` through the
+repo's own marketplace (`.claude-plugin/marketplace.json`), at user scope. Claude Code reads
+them **from the repo folder**, so after a `git pull` a `/reload-plugins` is all it takes.
+
+| Mod | What you see |
+|-----|--------------|
+| `session-band` | At session start, a band above the prompt: last session note of this project in the vault (date, title, next steps), git branch/dirty/unpushed, open PRs. Hides on the first prompt. Adds `/vault` (pane with the last note's closing state and next steps) and `/health` (re-run the health check). After 3h of session with nothing written to the vault's sessions folder, a toast + native notification reminds you to save. |
+| `guardrails` | Invisible until needed. Denies: `git push --force` (unless `--force-with-lease`), deleting `main`/`master`, `git reset --hard` on main, `rm -rf` of `~` or `/`, and edits to `.env*` (not `.env.example`), `secrets/`, `credentials.json`, `*token*.json`, SSH keys. |
+
+Manual install on a machine: `claude plugin marketplace add <repo path>` then
+`claude plugin install session-band@claude-agents` (same for `guardrails`). Remove with
+`claude plugin uninstall <mod>@claude-agents`. Both need Claude Code with mods support (v2.1.29x+).
+
 ## Status Line
 
 `install`/`sync` also configure a status line (only if you have none; a custom one is left
@@ -360,8 +375,9 @@ Fable · claude-agents · main* ↑2 · PR #11
 ctx ████░░░░░░ 38% (76k/200k) · cache 91% warm · $0.42 · 12m · 5h 24% · 7d 41%
 ```
 
-Line 1: model, project, git branch (`*` dirty, `↑n` unpushed), open PR, `fast`/effort when
-non-default. Line 2: context window usage (green/yellow/red), prompt-cache hit ratio and
+Line 1: model, project, git branch (`*` dirty, `↑n` unpushed), `vault Nd` (days since the last
+session note of this project in the machine's vault; yellow after a day, red after a week), open PR,
+`fast`/effort when non-default. Line 2: context window usage (green/yellow/red), prompt-cache hit ratio and
 warm/cold, session cost and duration, 5-hour and 7-day rate-limit usage. Fields that Claude
 Code does not provide (older versions, no git) are skipped. To use your own, set
 `statusLine` in `~/.claude/settings.json`; the installer will not touch it.

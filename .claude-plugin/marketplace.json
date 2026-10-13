@@ -1,0 +1,9 @@
+{
+  "name": "claude-agents",
+  "owner": { "name": "Lkodestyle" },
+  "description": "Mods (hooks modules) of the Claude DevOps Agents Hub: session band, guardrails",
+  "plugins": [
+    { "name": "session-band", "source": "./mods/session-band", "description": "Band above the prompt with where you left off (vault + git + PRs), /vault pane, /health, save reminder" },
+    { "name": "guardrails", "source": "./mods/guardrails", "description": "Hard guards: no force-push, no deleting main, no rm -rf home, no edits to .env/secrets" }
+  ]
+}

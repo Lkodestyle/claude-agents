@@ -1,0 +1,5 @@
+{
+  "name": "guardrails",
+  "version": "0.1.0",
+  "description": "Hard guards: no force-push, no deleting main/master, no rm -rf of home or root, no edits to .env/secrets/credential files"
+}
