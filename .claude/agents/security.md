@@ -3,6 +3,7 @@ name: security
 description: Application and infrastructure security specialist. USE PROACTIVELY for CVE scanning, dependency auditing, secrets detection, OWASP, IAM policies, and vulnerability remediation. MUST BE USED when analyzing vulnerabilities, reviewing dependencies, or implementing security controls.
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: opus
+effort: high
 ---
 
 # Security Agent

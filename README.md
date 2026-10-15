@@ -400,6 +400,7 @@ The hooks are defined once in `scripts/hooks.json` and installed by
 | `UserPromptSubmit` | `context-router.py` | Activate agents based on keywords |
 | `SessionStart` | `session-health.py` | Warn about Obsidian down, vault not mounted, duplicated hooks, broken agent links |
 | `SessionStart` | `pool-loader.py` | Load state from other instances (only with `CLAUDE_INSTANCE`) |
+| `PostToolUse` (Edit\|Write) | `lint-gate.py` | Auto-format the edited file and feed remaining lint errors back to Claude. Opt-in **by repo convention**: a tool only runs where the repo already uses it (ruff/prettier/eslint config present; gofmt/terraform fmt/bash -n always safe). Repos without tooling are untouched |
 | `Stop` | `pool-extractor.py` | Save completion signals |
 
 The installer **merges** into your existing `settings.json`: it only replaces
