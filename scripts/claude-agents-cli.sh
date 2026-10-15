@@ -550,6 +550,14 @@ cmd_install() {
     cleanup_legacy_state
     [[ "$target" == "global" ]] && install_mods
 
+    # Per-machine vault config: detect this machine's Obsidian vault and write
+    # ~/.claude/vault.json (skips silently when it already exists; every vault
+    # is different per machine and may not be in git, so nothing is assumed).
+    if [[ "$target" == "global" && ! -f "$CLAUDE_HOME/vault.json" ]]; then
+        log_step "Detecting this machine's Obsidian vault..."
+        $PYTHON_BIN "$REPO_DIR/.claude/scripts/vault-setup.py" ||             log_warn "No vault detected; run: $PYTHON_BIN $REPO_DIR/.claude/scripts/vault-setup.py --path /ruta/al/vault"
+    fi
+
     # Install config files
     log_step "Installing configuration files..."
 
