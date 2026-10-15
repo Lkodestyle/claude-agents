@@ -99,6 +99,8 @@ vault) mandan sobre las skills.
 - `timeout` de hooks es en **segundos**.
 - Router v3: una linea por prompt, sin inyectar contenido; estado en `~/.claude/router/`.
 - `session-health.py` avisa al arrancar si Obsidian/vault/hooks/agentes tienen problemas.
+- `vault-setup.py` genera el `~/.claude/vault.json` de la maquina DETECTANDO su vault (cada PC
+  tiene el suyo; puede no estar en git). Lo corre `install` si falta; nunca asumir rutas de otra PC.
 - `statusline.py` muestra contexto, cache, costo, rate limits y dias desde la ultima nota de
   sesion; se instala solo si no hay otro.
 - Mods en `mods/` (`session-band`, `guardrails`): plugins instalados desde el marketplace del

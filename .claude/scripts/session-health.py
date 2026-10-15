@@ -91,7 +91,7 @@ def check_vault(servers: dict) -> List[str]:
     if path and not Path(path).expanduser().exists():
         out.append(f"Vault: {path} not found ({source}) -> vault reads/writes will fail (drive not mounted?)")
     if not vault_cfg:
-        out.append("Vault: no ~/.claude/vault.json -> session-resume/save will ask which vault to use on this machine")
+        out.append("Vault: no ~/.claude/vault.json -> run `python3 ~/.claude/scripts/vault-setup.py` (detects this machine's Obsidian vault)")
     return out
 
 

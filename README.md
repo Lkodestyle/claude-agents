@@ -291,6 +291,14 @@ The session skills read the vault through whatever `~/.claude/vault.json` names 
   `claude mcp add obsidian -s user -t http http://127.0.0.1:27123/mcp/ -H "Authorization: Bearer $OBSIDIAN_API_KEY"`
 - **`filesystem`**: plain reads/writes on `path`, no MCP at all.
 
+**Per-machine config is generated, not copied**: `install` runs
+`.claude/scripts/vault-setup.py` when `~/.claude/vault.json` is missing. It reads the
+vaults registered in Obsidian on THIS machine (Linux/macOS/Windows/WSL), detects layout
+(`02-projects/`, sessions folder, rules note, template, validator) and whether the vault
+is a git repo, and writes the config. Several vaults or none → it tells you and takes
+`--path`. Each machine's vault is independent; a vault without git is used read/write
+locally, never pulled or pushed.
+
 `scripts/setup-obsidian.sh` walks through the REST setup if you want it.
 
 ### Setup

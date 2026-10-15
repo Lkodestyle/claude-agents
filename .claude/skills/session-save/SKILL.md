@@ -11,9 +11,13 @@ on the vault of **this machine**, never on another one's.
 
 ## 0. Preconditions
 
-Same as `session-resume`: read `~/.claude/vault.json` (ask once and create it if
-missing), check `path` exists, choose the MCP (`obsidian-vault` / `obsidian` /
-`filesystem`), resolve the project folder. If `git` is configured: `git -C <path> pull
+Same as `session-resume`: read `~/.claude/vault.json` (if missing, run
+`python3 ~/.claude/scripts/vault-setup.py`, or ask for the path and pass `--path`),
+check `path` exists, choose the MCP (`obsidian-vault` / `obsidian` /
+`filesystem`), resolve the project folder. Every field beyond `name`/`path`/`mcp` is
+optional: a vault without `git` is never pulled or pushed; without `rules_note`,
+template or validator, use the defaults below and skip the validate step; without
+`projects_dir`, work from the vault root. If `git` is configured: `git -C <path> pull
 --ff-only -q` before touching anything, so you never write on top of a stale clone.
 Run the pull as its OWN command and check its result: if it fails for credentials over
 https, retry with `git -c credential.helper='!gh auth git-credential' pull --ff-only`.
