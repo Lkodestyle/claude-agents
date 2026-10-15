@@ -99,6 +99,8 @@ vault) mandan sobre las skills.
 - `timeout` de hooks es en **segundos**.
 - Router v3: una linea por prompt, sin inyectar contenido; estado en `~/.claude/router/`.
 - `session-health.py` avisa al arrancar si Obsidian/vault/hooks/agentes tienen problemas.
+- `lint-gate.py` (PostToolUse en Edit/Write): auto-formatea y devuelve errores de lint a
+  Claude; solo actua donde el repo ya usa esa herramienta (config de ruff/prettier/eslint).
 - `vault-setup.py` genera el `~/.claude/vault.json` de la maquina DETECTANDO su vault (cada PC
   tiene el suyo; puede no estar en git). Lo corre `install` si falta; nunca asumir rutas de otra PC.
 - `statusline.py` muestra contexto, cache, costo, rate limits y dias desde la ultima nota de
