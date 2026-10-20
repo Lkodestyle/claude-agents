@@ -49,6 +49,14 @@ agents, keeps working while they run, and relays what matters when they report b
 | Implementation | Give a **closed, verifiable** task: what to change, how to check it (tests, `terraform plan`, lint, build). |
 | Large orchestration (N agents, review → verify pipelines) | The `Workflow` tool, **only** when the user asked for it ("use a workflow", "ultracode"). |
 
+Cost tuning per call (the agent definition sets the default; the call can override):
+
+- `model: "haiku"` for cheap, mechanical checks (does X exist, run Y and report the exit
+  code, count Z): a verifier rarely needs sonnet.
+- `effort` only when the user or a skill asks for a level; otherwise let the default rule.
+- `architecture` and `security` are pinned to opus + high effort in their definitions:
+  do not downgrade them for design or security judgement.
+
 Rules of thumb:
 
 - Once you delegate something, **don't also do it yourself**; wait for the result.

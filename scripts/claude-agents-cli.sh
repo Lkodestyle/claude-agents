@@ -223,7 +223,7 @@ for event, groups in merged.get("hooks", {}).items():
         hooks[event] = kept
 for event, groups in managed.items():
     for group in groups:
-        new_group = {k: v for k, v in group.items() if k != "matcher"}
+        new_group = dict(group)
         new_group["hooks"] = [rewrite(h) for h in group.get("hooks", [])]
         hooks.setdefault(event, []).append(new_group)
 merged["hooks"] = hooks
